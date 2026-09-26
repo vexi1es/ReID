@@ -1,0 +1,14 @@
+*
+!infer.py
+!requirements-infer.txt
+!reid/__init__.py
+!reid/data.py
+!reid/rerank.py
+!reid/submit.py
+!weights/*.onnx
+!weights/cam_bank.npz
+!weights/meta.json
+!requirements-service.txt
+!service/api/*.py
+!service/api/Dockerfile
+!service/web/*

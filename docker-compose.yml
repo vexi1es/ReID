@@ -1,0 +1,35 @@
+# Сервис:          docker compose up -d        -> http://localhost:8080  (Swagger: /api/docs)
+# Пакетная сдача:  docker compose run --rm infer  -> ./output: submission.csv, embeddings.npy, candidates.csv
+services:
+  api:                          # backend инференса + векторный индекс FAISS + метаданные SQLite
+    build: {context: ., dockerfile: service/api/Dockerfile}
+    image: lct7-reid-api:latest
+    volumes:
+      - store:/store            # база галереи (переживает перезапуск)
+      - ./data:/data:ro         # тестовые данные для демо-галереи
+    networks: [backend]
+    restart: unless-stopped
+
+  web:                          # тонкий клиент в браузере + прокси /api -> api
+    build: {context: ., dockerfile: service/web/Dockerfile}
+    image: lct7-reid-web:latest
+    ports: ["8080:80"]
+    depends_on: [api]
+    networks: [backend, frontend]
+    restart: unless-stopped
+
+  infer:                        # пакетный инференс для сдачи (офлайн)
+    build: .
+    image: lct7-vehicle-reid:latest
+    network_mode: none          # офлайн: все веса внутри образа
+    profiles: [batch]
+    volumes:
+      - ./data:/data:ro         # test_query.csv, test_gallery.csv, images/
+      - ./output:/out           # submission.csv, embeddings.npy, candidates.csv
+
+networks:
+  backend: {internal: true}     # у api нет выхода в интернет
+  frontend: {}
+
+volumes:
+  store: {}

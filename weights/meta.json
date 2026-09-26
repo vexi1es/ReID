@@ -1,0 +1,18 @@
+{
+ "models": [
+  {
+   "onnx": "reid.onnx",
+   "size": 224,
+   "weight": 0.7,
+   "backbone": "facebook/dinov2-base",
+   "ckpt": "runs/final/last.pt"
+  },
+  {
+   "onnx": "reid_cnx.onnx",
+   "size": 256,
+   "weight": 0.3,
+   "backbone": "timm:convnext_small.dinov3_lvd1689m",
+   "ckpt": "runs_final_cnx/last.pt"
+  }
+ ]
+}

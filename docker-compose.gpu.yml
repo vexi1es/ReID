@@ -1,0 +1,18 @@
+# GPU:  docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d   (нужен NVIDIA Container Toolkit)
+services:
+  api:
+    build:
+      args: {ORT: "onnxruntime-gpu[cuda,cudnn]==1.23.2"}
+    image: lct7-reid-api:gpu
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+  infer:
+    build:
+      args: {ORT: "onnxruntime-gpu[cuda,cudnn]==1.23.2"}
+    image: lct7-vehicle-reid:gpu
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]

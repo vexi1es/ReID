@@ -1,0 +1,10 @@
+# сервис (API): как requirements-infer.txt + веб-фреймворк и векторный индекс
+numpy==1.26.4
+pandas==2.2.2
+pillow==11.2.1
+onnxruntime==1.23.2
+fastapi==0.115.13
+pydantic==2.11.7
+uvicorn==0.34.3
+python-multipart==0.0.20
+faiss-cpu==1.11.0

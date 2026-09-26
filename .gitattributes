@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.npy binary
+*.onnx binary
+*.npz binary

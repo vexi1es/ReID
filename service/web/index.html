@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цифровой признак ТС</title>
+<style>
+  :root {
+    --bg: #f6f5f9; --panel: #ffffff; --ink: #1c1d22; --muted: #6b6a78; --line: #e4e2ec;
+    --accent: #ff0053; --accent-soft: #ffd6e4; --deep: #310f53; --ok: #13795b; --ok-soft: #dff3ea;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 Montserrat, "Segoe UI", system-ui, sans-serif; }
+  header { background: var(--deep); color: #fff; padding: 14px 24px; display: flex; gap: 24px; align-items: center; }
+  header b { font-size: 17px; letter-spacing: .2px; }
+  header nav { display: flex; gap: 4px; margin-left: auto; }
+  header nav button { background: none; border: 0; color: #cfc6e6; padding: 8px 14px; border-radius: 8px;
+                      font: inherit; cursor: pointer; }
+  header nav button.on { background: rgba(255,255,255,.12); color: #fff; }
+  header a { color: #cfc6e6; font-size: 13px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 48px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } header { flex-wrap: wrap; } header nav { margin-left: 0; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 12px; }
+  .stage { position: relative; background: #111; border-radius: 10px; overflow: hidden; min-height: 220px;
+           display: flex; align-items: center; justify-content: center; color: #888; user-select: none; }
+  .stage canvas { max-width: 100%; display: block; cursor: crosshair; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  button.main { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 10px 18px;
+                font: 600 15px Montserrat, "Segoe UI", sans-serif; cursor: pointer; }
+  button.main:disabled { opacity: .45; cursor: default; }
+  button.ghost, label.ghost { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px;
+                 font: inherit; cursor: pointer; color: var(--ink); }
+  input[type=file] { display: none; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 12px; }
+  .samples img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; cursor: pointer;
+                 border: 2px solid transparent; background: #ddd; }
+  .samples img.on { border-color: var(--accent); }
+  .opts { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center; margin-top: 14px; font-size: 14px; }
+  .verdict { border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; display: none; }
+  .verdict.ok { background: var(--ok-soft); color: var(--ok); display: block; }
+  .verdict.no { background: var(--accent-soft); color: #a3003a; display: block; }
+  .verdict b { font-size: 18px; display: block; }
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; position: relative; }
+  .card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #eee; }
+  .card .meta { padding: 6px 8px 8px; font-size: 12px; }
+  .card .rank { position: absolute; top: 6px; left: 6px; background: rgba(28,29,34,.8); color: #fff;
+                border-radius: 6px; padding: 1px 7px; font-size: 12px; }
+  .card.acc { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+  .bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--deep); }
+  .card.acc .bar i { background: var(--ok); }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+  .stat { font-size: 28px; font-weight: 700; color: var(--deep); }
+  progress { width: 100%; height: 8px; accent-color: var(--accent); }
+  .hidden { display: none !important; }
+  code { background: #f0eef6; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Цифровой признак ТС</b>
+  <span class="hint" style="color:#cfc6e6">поиск автомобиля по камерам без госномера</span>
+  <nav>
+    <button data-tab="search" class="on">Поиск</button>
+    <button data-tab="gallery">Галерея</button>
+  </nav>
+  <a href="/api/docs" target="_blank">API (Swagger)</a>
+</header>
+
+<main>
+  <section id="tab-search" class="grid">
+    <div class="panel">
+      <h2>1. Кадр-запрос и рамка ТС</h2>
+      <div class="stage" id="stage"><span>Выберите пример ниже или загрузите кадр</span></div>
+      <div class="row">
+        <label class="ghost">Загрузить кадр<input type="file" id="file" accept="image/jpeg,image/png"></label>
+        <span class="hint" id="bboxInfo">Рамку можно нарисовать мышью. Без рамки — весь кадр считается машиной.</span>
+      </div>
+      <h2 style="margin-top:18px">Примеры из тестовой выборки</h2>
+      <div class="samples" id="samples"></div>
+      <div class="opts">
+        <span>Порог отказа</span><input type="range" id="thr" min="0" max="0.9" step="0.01" value="0.30"><b id="thrV">0.30</b>
+        <span>Кандидатов</span><input type="range" id="topk" min="1" max="30" step="1" value="10"><b id="topkV">10</b>
+        <span>Другие камеры</span><label><input type="checkbox" id="xcam" checked> исключать кадры той же камеры</label><span></span>
+      </div>
+      <div class="row"><button class="main" id="go" disabled>Найти</button><span class="hint" id="timing"></span></div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Результат</h2>
+      <div class="verdict" id="verdict"></div>
+      <div class="results" id="results"><div class="empty">Здесь появятся кандидаты из галереи</div></div>
+      <div class="row hidden" id="exportRow">
+        <button class="ghost" id="expJson">Экспорт JSON</button>
+        <button class="ghost" id="expCsv">Экспорт CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-gallery" class="grid hidden">
+    <div class="panel">
+      <h2>Галерея</h2>
+      <div class="stat" id="gCount">—</div>
+      <div class="hint" id="gInfo"></div>
+      <div class="row">
+        <button class="main" id="demoLoad">Загрузить тестовую галерею</button>
+        <button class="ghost" id="gClear">Очистить</button>
+      </div>
+      <progress id="demoProg" class="hidden" value="0" max="1"></progress>
+      <div class="hint" id="demoText"></div>
+      <h2 style="margin-top:22px">Добавить своё ТС</h2>
+      <div class="hint">Выберите кадр на вкладке «Поиск», нарисуйте рамку и нажмите:</div>
+      <div class="row">
+        <input id="gLabel" placeholder="подпись (необязательно)" style="padding:9px;border:1px solid var(--line);border-radius:10px;font:inherit">
+        <button class="ghost" id="gAdd">Добавить текущий кадр</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Последние объекты</h2>
+      <div class="results" id="gList"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let img = null, blob = null, bbox = null, last = null;
+const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
+
+document.querySelectorAll("header nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("header nav button").forEach(x => x.classList.toggle("on", x === b));
+  $("#tab-search").classList.toggle("hidden", b.dataset.tab !== "search");
+  $("#tab-gallery").classList.toggle("hidden", b.dataset.tab !== "gallery");
+  if (b.dataset.tab === "gallery") refreshGallery();
+});
+
+function draw() {
+  if (!img) return;
+  ctx.drawImage(img, 0, 0);
+  if (bbox) {
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, bbox.x, bbox.y, bbox.w, bbox.h, bbox.x, bbox.y, bbox.w, bbox.h);
+    ctx.strokeStyle = "#ff0053"; ctx.lineWidth = Math.max(3, canvas.width / 300);
+    ctx.strokeRect(bbox.x, bbox.y, bbox.w, bbox.h);
+  }
+  $("#bboxInfo").textContent = bbox
+    ? `Рамка: x ${bbox.x|0}, y ${bbox.y|0}, ${bbox.w|0}×${bbox.h|0}. Можно перерисовать мышью.`
+    : "Рамку можно нарисовать мышью. Без рамки — весь кадр считается машиной.";
+}
+
+function setImage(b, box) {
+  blob = b; bbox = box || null;
+  const u = URL.createObjectURL(b);
+  const im = new Image();
+  im.onload = () => {
+    img = im; canvas.width = im.naturalWidth; canvas.height = im.naturalHeight;
+    const st = $("#stage"); st.innerHTML = ""; st.appendChild(canvas); draw();
+    $("#go").disabled = false;
+  };
+  im.src = u;
+}
+
+let drag = null;
+function pt(e) {
+  const r = canvas.getBoundingClientRect(), p = e.touches ? e.touches[0] : e;
+  return { x: (p.clientX - r.left) * canvas.width / r.width, y: (p.clientY - r.top) * canvas.height / r.height };
+}
+canvas.addEventListener("pointerdown", e => { drag = pt(e); canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const p = pt(e);
+  bbox = { x: Math.min(drag.x, p.x), y: Math.min(drag.y, p.y), w: Math.abs(p.x - drag.x), h: Math.abs(p.y - drag.y) };
+  draw();
+});
+canvas.addEventListener("pointerup", () => { drag = null; if (bbox && (bbox.w < 8 || bbox.h < 8)) { bbox = null; draw(); } });
+
+$("#file").onchange = e => { const f = e.target.files[0]; if (f) { setImage(f, null); markSample(null); } };
+
+function markSample(el) { document.querySelectorAll(".samples img").forEach(x => x.classList.toggle("on", x === el)); }
+async function loadSamples() {
+  const r = await fetch("/api/demo/queries?limit=24");
+  const list = r.ok ? await r.json() : [];
+  if (!list.length) { $("#samples").innerHTML = '<span class="hint">Демо-данные не смонтированы</span>'; return; }
+  for (const q of list) {
+    const el = document.createElement("img");
+    el.loading = "lazy"; el.alt = "пример";
+    el.src = q.url;
+    el.onclick = async () => {
+      markSample(el);
+      const b = await (await fetch(q.url)).blob();
+      setImage(b, { x: q.x, y: q.y, w: q.w, h: q.h });
+    };
+    el.onload = () => {       // превью — вырезанное ТС
+      const c = document.createElement("canvas"); c.width = c.height = 96;
+      const s = Math.max(q.w, q.h), cx = q.x + q.w / 2, cy = q.y + q.h / 2;
+      c.getContext("2d").drawImage(el, cx - s / 2, cy - s / 2, s, s, 0, 0, 96, 96);
+      el.onload = null; el.src = c.toDataURL("image/jpeg", .85);
+    };
+    $("#samples").appendChild(el);
+  }
+}
+
+function form(extra) {
+  const f = new FormData();
+  f.append("file", blob, "frame.jpg");
+  if (bbox) for (const k of ["x", "y", "w", "h"]) f.append(k, Math.round(bbox[k]));
+  for (const [k, v] of Object.entries(extra || {})) f.append(k, v);
+  return f;
+}
+
+$("#thr").oninput = e => $("#thrV").textContent = (+e.target.value).toFixed(2);
+$("#topk").oninput = e => $("#topkV").textContent = e.target.value;
+
+$("#go").onclick = async () => {
+  $("#go").disabled = true; $("#timing").textContent = "считаю признак…";
+  try {
+    const r = await fetch("/api/search", { method: "POST",
+      body: form({ top_k: $("#topk").value, threshold: $("#thr").value, exclude_same_camera: $("#xcam").checked }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    last = d; render(d);
+  } catch (e) {
+    $("#verdict").className = "verdict no"; $("#verdict").innerHTML = `<b>Ошибка</b>${e.message}`;
+  } finally { $("#go").disabled = false; }
+};
+
+function card(m, i) {
+  const pct = Math.max(0, Math.min(1, m.score)) * 100;
+  return `<div class="card ${m.accepted ? "acc" : ""}">
+    <span class="rank">${i + 1}</span><img src="${m.crop_url}" alt="кандидат ${i + 1}" loading="lazy">
+    <div class="meta">${m.score.toFixed(3)}${m.camera != null ? ` · кам. ${m.camera}` : ""}
+    <div class="bar"><i style="width:${pct}%"></i></div></div></div>`;
+}
+
+function render(d) {
+  const v = $("#verdict");
+  if (!d.ranking.length) {
+    v.className = "verdict no"; v.innerHTML = "<b>Галерея пуста</b>Загрузите её на вкладке «Галерея».";
+  } else if (d.refused) {
+    v.className = "verdict no";
+    v.innerHTML = `<b>Отказ: уверенного совпадения нет</b>Лучшая близость ${d.ranking[0].score.toFixed(3)} ниже порога ${d.threshold.toFixed(2)}.`;
+  } else {
+    v.className = "verdict ok";
+    v.innerHTML = `<b>Кандидат найден</b>Близость ${d.candidates[0].score.toFixed(3)} при пороге ${d.threshold.toFixed(2)}` +
+                  (d.query_camera != null ? ` · камера запроса ${d.query_camera}` : "");
+  }
+  $("#results").innerHTML = d.ranking.map(card).join("") || '<div class="empty">Нет кандидатов</div>';
+  $("#timing").textContent = `${d.ms} мс на сервере`;
+  $("#exportRow").classList.remove("hidden");
+}
+
+function save(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+}
+$("#expJson").onclick = () => last && save("search_result.json", JSON.stringify(last, null, 1), "application/json");
+$("#expCsv").onclick = () => last && save("search_result.csv",
+  "rank,gallery_id,label,camera,score,accepted\n" +
+  last.ranking.map((m, i) => [i + 1, m.id, m.label ?? "", m.camera ?? "", m.score, m.accepted].join(",")).join("\n"),
+  "text/csv");
+
+async function refreshGallery() {
+  const h = await (await fetch("/api/health")).json();
+  $("#gCount").textContent = `${h.gallery} объектов`;
+  document.querySelectorAll("#demoLoad, #gClear, #gAdd").forEach(b => b.disabled = h.readonly);
+  if (h.readonly) $("#demoText").textContent = "Демо-режим: галерея только для чтения.";
+  $("#gInfo").textContent = `индекс ${h.index} · ${h.dim} чисел на ТС · ${h.providers[0].replace("ExecutionProvider", "")} · порог ${h.threshold}`;
+  const list = await (await fetch(`/api/gallery?limit=40&offset=${Math.max(0, h.gallery - 40)}`)).json();
+  $("#gList").innerHTML = list.reverse().map(m =>
+    `<div class="card"><img src="/api/gallery/${m.id}/crop" alt="" loading="lazy"><div class="meta">#${m.id}${m.camera != null ? ` · кам. ${m.camera}` : ""}</div></div>`
+  ).join("") || '<div class="empty">Пусто</div>';
+}
+
+$("#demoLoad").onclick = async () => {
+  const r = await fetch("/api/demo/load", { method: "POST" });
+  if (!r.ok) { $("#demoText").textContent = (await r.json()).detail; return; }
+  $("#demoProg").classList.remove("hidden");
+  const t = setInterval(async () => {
+    const s = await (await fetch("/api/demo/status")).json();
+    $("#demoProg").max = s.total || 1; $("#demoProg").value = s.done;
+    $("#demoText").textContent = s.error ? `Ошибка: ${s.error}` : `${s.done} / ${s.total}`;
+    if (!s.running) { clearInterval(t); refreshGallery(); }
+  }, 1000);
+};
+$("#gClear").onclick = async () => { if (confirm("Удалить все объекты галереи?")) { await fetch("/api/gallery", { method: "DELETE" }); refreshGallery(); } };
+$("#gAdd").onclick = async () => {
+  if (!blob) { alert("Сначала выберите кадр на вкладке «Поиск»"); return; }
+  const r = await fetch("/api/gallery", { method: "POST", body: form({ label: $("#gLabel").value }) });
+  const d = await r.json();
+  if (!r.ok) { alert(d.detail); return; }
+  refreshGallery();
+};
+
+loadSamples();
+</script>
+</body>
+</html>

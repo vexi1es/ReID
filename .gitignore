@@ -1,0 +1,12 @@
+# веса — в GitHub Releases (python get_weights.py)
+weights/*.onnx
+weights/*.npz
+weights/*.part
+# данные организаторов и результаты запуска
+data/
+output/
+store/
+crops/
+runs/
+__pycache__/
+*.pyc
