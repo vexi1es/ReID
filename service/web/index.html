@@ -204,6 +204,14 @@ async function loadSamples() {
     };
     $("#samples").appendChild(el);
   }
+  if (location.hash === "#demo") {        // ссылка-демо: сразу показать поиск по первому примеру
+    const first = $("#samples img");
+    first.addEventListener("load", () => setTimeout(async () => {
+      first.click();
+      await new Promise(r => setTimeout(r, 1500));
+      $("#go").click();
+    }, 300), { once: true });
+  }
 }
 
 function form(extra) {

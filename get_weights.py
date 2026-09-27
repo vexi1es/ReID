@@ -11,7 +11,7 @@ import urllib.request
 
 REPO = "vexi1es/ReID"
 TAG = "v1.0"
-FILES = ["reid.onnx", "reid_cnx.onnx", "bg.onnx", "cam_bank.npz"]
+FILES = ["reid.onnx", "reid_cnx.onnx", "bg.onnx", "view.onnx", "cam_bank.npz"]
 
 
 def main():

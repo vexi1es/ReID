@@ -10,6 +10,7 @@
   1. вырезаем ТС по bbox (+5% запаса) -> 224x224 -> reid.onnx, flip-TTA -> эмбеддинг;
   2. полный кадр 392x224 с закрашенным bbox -> bg.onnx -> камера (kNN по банку фонов train);
   3. ранжирование: k-reciprocal re-ranking, кадры той же камеры, что и запрос, — вниз;
+     если в weights/meta.json есть блок "view": ракурс ТС (view.onnx) и бонус парам спереди<->сзади;
   4. candidates: top-1 итогового ранжирования (другие камеры), уверенность — косинус, отказ ниже порога.
 """
 import argparse
@@ -160,10 +161,22 @@ def main():
         np.save(f"{args.out}/embeddings.npy", np.concatenate([q_emb, g_emb]))
         q_cam = predict_cameras(run(bg, background_tensor, q, images, args.batch, pool), bank)
         g_cam = predict_cameras(run(bg, background_tensor, g, images, args.batch, pool), bank)
+        view = meta.get("view")
+        if view:
+            vs = ort.InferenceSession(f"{args.weights}/{view['onnx']}", opts, providers=prov)
+            vt = lambda d, r, s=view["size"]: vehicle_tensor(d, r, s)
+            cls = np.array(view["classes"])
+            q_view = cls[run(vs, vt, q, images, args.batch, pool).argmax(1)]
+            g_view = cls[run(vs, vt, g, images, args.batch, pool).argmax(1)]
 
     cos = q_emb @ g_emb.T
     score = -k_reciprocal(q_emb, g_emb, **RERANK)
     score = np.where(q_cam[:, None] == g_cam[None], score - 10, score)
+    if view:
+        # тот же ТС с противоположной стороны похож меньше, чем соседний ТС с той же стороны
+        # (VANet, ICCV 2019; VOC-ReID, AI City 2020): бонус парам спереди<->сзади, +0.021 mAP на валидации
+        opp = ((q_view[:, None] == "front") & (g_view[None] == "rear")) |               ((q_view[:, None] == "rear") & (g_view[None] == "front"))
+        score = score + view["beta"] * opp
     order = np.argsort(-score, axis=1, kind="stable")[:, :10]
     write_submission(f"{args.out}/submission.csv", q_ids, g_ids, order)
     # кандидат = top-1 итогового кросс-камерного ранжирования, уверенность — его косинус

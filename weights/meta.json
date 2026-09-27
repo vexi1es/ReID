@@ -14,5 +14,15 @@
    "backbone": "timm:convnext_small.dinov3_lvd1689m",
    "ckpt": "runs_final_cnx/last.pt"
   }
- ]
+ ],
+ "view": {
+  "onnx": "view.onnx",
+  "size": 224,
+  "classes": [
+   "front",
+   "rear",
+   "side"
+  ],
+  "beta": 0.08
+ }
 }
