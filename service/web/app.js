@@ -30,6 +30,8 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  // COCO путает легковые и грузовые (седан бывает «грузовиком») — для них показываем просто «машина»
+  const kindText = k => (k === "автобус" || k === "мотоцикл" ? k : "машина");
   const band = (s, thr) => (s >= 0.6 ? "hi" : s >= thr ? "mid" : "lo");
   const bandName = { hi: "высокая", mid: "средняя", lo: "ниже порога" };
   const camText = c => (c == null ? "кам. —" : `кам. ${c}`);
@@ -145,7 +147,7 @@
       cv.width = Math.max(1, Math.round(d.w * k)); cv.height = Math.max(1, Math.round(d.h * k));
       try { cv.getContext("2d").drawImage(S.img, d.x, d.y, d.w, d.h, 0, 0, cv.width, cv.height); } catch { /* кадр ещё не готов */ }
       const th = el("span", "det-thumb"); th.appendChild(cv);
-      b.append(th, el("span", "det-cap", `${i + 1} · ${d.kind} ${Math.round(d.score * 100)}%`));
+      b.append(th, el("span", "det-cap", `${i + 1} · ${kindText(d.kind)} ${Math.round(d.score * 100)}%`));
       b.onclick = () => choose({ ...d });
       box.appendChild(b);
     });
@@ -190,7 +192,7 @@
       r.dataset.i = i;
       svg.appendChild(r);
       const lh = Math.max(26, S.H / 34), fs = lh * 0.68;
-      const txt = `${i + 1} · ${d.kind} ${Math.round(d.score * 100)}%`;
+      const txt = `${i + 1} · ${kindText(d.kind)} ${Math.round(d.score * 100)}%`;
       const lw = txt.length * fs * 0.56 + fs, lx = Math.max(0, Math.min(d.x, S.W - lw));   // подпись не уезжает за край
       const lab = document.createElementNS(NS, "rect");
       lab.setAttribute("x", lx); lab.setAttribute("y", Math.max(0, d.y - lh));
