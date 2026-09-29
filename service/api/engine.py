@@ -142,10 +142,8 @@ def explain(engine, q_crop, c_crop, side=448):
     out = {}
     for key, h, crop in (("query", heat_q, q_crop), ("candidate", heat_c, c_crop)):
         h = np.maximum(h, 0).reshape(g, g)
-        # показываем только главные участки: нижние 60% вклада (ровный фон, асфальт) гасим,
-        # верх шкалы — 99-й перцентиль, чтобы отдельные «шумные» токены DINOv2 не забивали шкалу
-        lo, top = np.percentile(h, 60), np.percentile(h, 99)
-        h = np.clip((h - lo) / max(top - lo, 1e-9), 0, 1) ** 1.3
+        top = np.percentile(h, 99) or 1.0      # отдельные «шумные» токены DINOv2 не забивают шкалу
+        h = np.clip(h / top, 0, 1)
         out[key] = {"image": _jpeg(crop, side), "heat": _colorize(h, side),
                     "aspect": round(crop.size[0] / max(1, crop.size[1]), 4)}   # w/h: показать без искажений
     out["similarity_vit"] = float(emb[0] @ emb[1])
