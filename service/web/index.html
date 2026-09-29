@@ -1,764 +1,195 @@
 <!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ReID · Поиск ТС по городским камерам</title>
-  <meta name="description" content="Сервис распознавания и поиска автомобиля по камерам городской сети без госномера">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReID · поиск машины по камерам</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-  <!-- App Header -->
-  <header class="app-header">
-    <div class="header-inner">
-      <div class="brand">
-        <div class="brand-logo">
-          <svg viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="url(#brandGrad)"/>
-            <path d="M6 12V8H10M26 12V8H22M6 20V24H10M26 20V24H22" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M9 19L11 13H21L23 19M8 19H24C25 19 25.5 19.6 25.5 20.5V21.5H6.5V20.5C6.5 19.6 7 19 8 19Z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>
-            <circle cx="10.5" cy="21.5" r="1.5" fill="#FF0053"/>
-            <circle cx="21.5" cy="21.5" r="1.5" fill="#FF0053"/>
-            <defs>
-              <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#310F53"/>
-                <stop offset="100%" stop-color="#FF0053"/>
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div class="brand-titles">
-          <div class="brand-name">
-            <span>ReID</span>
-            <span class="brand-badge">ЛЦТ 2026</span>
-          </div>
-          <p class="brand-desc">Поиск автомобиля по городским камерам без госномера</p>
-        </div>
-      </div>
-
-      <!-- Live Health & Provider Status Pill -->
-      <div class="header-status">
-        <div class="status-indicator" id="statusPill" title="Статус подключения к сервису">
-          <span class="status-dot"></span>
-          <span class="status-text" id="statusText">Подключение…</span>
-        </div>
-        <div class="status-chip" id="galleryCountChip" title="Количество ТС в базе данных">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          <span id="headerGalleryCount">— ТС</span>
-        </div>
-        <div class="status-chip hardware-chip" id="providerChip" title="Аппаратный ускоритель вычислений">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
-          <span id="headerProvider">CPU</span>
-        </div>
-        <div class="status-chip readonly-chip hidden" id="readonlyChip" title="Галерея работает в режиме только для чтения">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          <span>Только чтение</span>
-        </div>
-      </div>
-
-      <!-- Navigation & Utility -->
-      <nav class="header-nav">
-        <button class="nav-btn active" data-tab="search" id="tabBtnSearch">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <span>Поиск</span>
-        </button>
-        <button class="nav-btn" data-tab="gallery" id="tabBtnGallery">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          <span>Галерея</span>
-        </button>
-        <button class="nav-btn" data-tab="info" id="tabBtnInfo">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-          <span>О модели</span>
-        </button>
-      </nav>
-
-      <div class="header-actions">
-        <a href="/api/docs" target="_blank" rel="noreferrer" class="btn-ghost-sm" title="Открыть спецификацию OpenAPI (Swagger)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          <span>Swagger API</span>
-        </a>
-        <button class="theme-toggle-btn" id="themeToggleBtn" title="Переключить тему оформления" aria-label="Переключить тему">
-          <svg class="sun-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg class="moon-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="app-main">
-
-    <!-- ============================================== -->
-    <!-- SCREEN 1: ПОИСК (SEARCH)                       -->
-    <!-- ============================================== -->
-    <section id="view-search" class="view-panel active">
-      <div class="search-layout">
-        
-        <!-- LEFT COLUMN: QUERY FRAME & STAGE -->
-        <div class="col-stage">
-          
-          <!-- Stage Card -->
-          <div class="card stage-card">
-            <div class="card-header">
-              <div class="header-left">
-                <span class="eyebrow">01 · КАДР-ЗАПРОС</span>
-                <h2 class="card-title">Выделение автомобиля на кадре</h2>
-              </div>
-              <div class="stage-tools">
-                <button class="tool-btn" id="btnFitStage" title="По размеру экрана">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                  <span>Вписать</span>
-                </button>
-                <button class="tool-btn" id="btnFullFrame" title="Считать весь кадр машиной">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                  <span>Весь кадр</span>
-                </button>
-                <button class="tool-btn danger" id="btnClearBbox" title="Сбросить выделение">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                  <span>Сбросить рамку</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Interactive Stage Area -->
-            <div class="canvas-viewport" id="stageViewport">
-              <div class="viewport-placeholder" id="viewportPlaceholder">
-                <div class="placeholder-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="3" y="3" width="18" height="18" rx="3"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
-                </div>
-                <h3>Кадр не выбран</h3>
-                <p>Выберите пример из тестовой выборки ниже или загрузите свой снимок с камеры</p>
-                <label class="btn-primary" style="margin-top: 10px;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                  <span>Загрузить кадр с ПК</span>
-                  <input type="file" id="fileInput" accept="image/jpeg,image/png" hidden>
-                </label>
-              </div>
-
-              <!-- Canvas and Overlay Elements -->
-              <div class="canvas-wrapper hidden" id="canvasWrapper">
-                <canvas id="mainCanvas"></canvas>
-                <!-- Animated AI Laser Scanner -->
-                <div class="ai-laser-scanner hidden" id="laserScanner">
-                  <div class="laser-beam"></div>
-                  <div class="laser-grid"></div>
-                </div>
-                <!-- Interactive Coordinate Floating Pill -->
-                <div class="bbox-pill hidden" id="bboxPill">
-                  <span class="pill-dot"></span>
-                  <span id="bboxPillCoords">x: 0, y: 0 · 0 × 0</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Stage Bottom Bar -->
-            <div class="stage-footer">
-              <div class="footer-left">
-                <label class="btn-outline-sm" title="Загрузить свой кадр">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                  <span>Загрузить свой кадр</span>
-                  <input type="file" id="fileInputSecondary" accept="image/jpeg,image/png" hidden>
-                </label>
-                <span class="crop-info" id="bboxInfo">Нарисуйте рамку мышью или пальцем (координаты кадра)</span>
-              </div>
-              <div class="resolution-badge" id="frameResolutionBadge">
-                1920 × 1080 px
-              </div>
-            </div>
-          </div>
-
-          <!-- Samples Carousel Card -->
-          <div class="card samples-card">
-            <div class="card-header">
-              <div class="header-left">
-                <span class="eyebrow">ТЕСТОВАЯ ВЫБОРКА</span>
-                <h3 class="card-subtitle">Примеры запросов из камер города</h3>
-              </div>
-              <div class="samples-count" id="samplesCountBadge">20 доступно</div>
-            </div>
-            <div class="samples-scroll" id="samplesContainer">
-              <!-- Dynamically populated sample thumbnails -->
-              <div class="samples-loading">
-                <div class="spinner-sm"></div>
-                <span>Загрузка тестовых кадров…</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Search Settings & Action Card -->
-          <div class="card settings-card">
-
-            <div class="settings-params">
-
-              <!-- Threshold Control -->
-              <div class="setting-tile">
-                <div class="setting-head">
-                  <span class="setting-title">
-                    Порог схожести
-                    <span class="info-tooltip" title="Косинусная близость ниже которой совпадение считается неуверенным (отказ). По умолчанию 0.30">ⓘ</span>
-                  </span>
-                  <span class="setting-pill" id="valThreshold">0.30</span>
-                </div>
-                <input type="range" id="rangeThreshold" min="0" max="0.9" step="0.01" value="0.30" class="app-range">
-              </div>
-
-              <!-- Top-K Control -->
-              <div class="setting-tile">
-                <div class="setting-head">
-                  <span class="setting-title">
-                    Число кандидатов Top-K
-                    <span class="info-tooltip" title="Сколько наиболее похожих автомобилей отображать в ленте результатов (1–30)">ⓘ</span>
-                  </span>
-                  <span class="setting-pill" id="valTopK">10</span>
-                </div>
-                <input type="range" id="rangeTopK" min="1" max="30" step="1" value="10" class="app-range">
-              </div>
-
-            </div>
-
-            <!-- Compact cross-camera toggle row -->
-            <label class="toggle-row-clean" for="checkExcludeSameCamera">
-              <div class="toggle-row-left">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0; color: var(--brand-lavender)"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 10h6M9 14h6" stroke-linecap="round"/></svg>
-                <span>Исключать кадры той же камеры</span>
-              </div>
-              <div class="toggle-switch">
-                <input type="checkbox" id="checkExcludeSameCamera" checked>
-                <span class="slider round"></span>
-              </div>
-            </label>
-
-            <!-- Action Bar -->
-            <div class="search-action-bar">
-              <button class="btn-search-main" id="btnRunSearch" disabled>
-                <div class="btn-content">
-                  <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <div class="search-spinner hidden"></div>
-                  <span class="btn-text">Найти автомобиль</span>
-                </div>
-                <div class="btn-ripple"></div>
-              </button>
-
-              <div class="search-timing-tag hidden" id="timingTag">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span id="timingText">—</span>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-        <!-- RIGHT COLUMN: RESULTS & CANDIDATES -->
-        <div class="col-results">
-          
-          <div class="card results-card">
-            
-            <div class="card-header">
-              <div class="header-left">
-                <span class="eyebrow">03 · РЕЗУЛЬТАТ ПОИСКА</span>
-                <h2 class="card-title">Идентификация и ранжирование</h2>
-              </div>
-              <!-- Export Controls -->
-              <div class="export-actions hidden" id="exportActionsGroup">
-                <button class="btn-outline-sm" id="btnExportJson" title="Скачать полный ответ API в формате JSON">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span>JSON</span>
-                </button>
-                <button class="btn-outline-sm" id="btnExportCsv" title="Экспорт результатов в таблицу CSV">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                  <span>CSV</span>
-                </button>
-                <button class="btn-ghost-sm" id="btnCopyJson" title="Скопировать JSON в буфер">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Dynamic Verdict Banner -->
-            <div class="verdict-banner empty-state" id="verdictBanner">
-              <div class="banner-icon-col">
-                <div class="verdict-icon-bubble" id="verdictIcon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                </div>
-              </div>
-              <div class="banner-content">
-                <h3 class="verdict-headline" id="verdictHeadline">Ожидание запроса</h3>
-                <p class="verdict-subtext" id="verdictSubtext">Выберите тестовый кадр или загрузите снимок и нажмите «Найти автомобиль»</p>
-                <div class="verdict-meta" id="verdictMeta"></div>
-              </div>
-            </div>
-
-            <!-- Best Match Spotlight Card (Hidden until match is found) -->
-            <div class="spotlight-card hidden" id="spotlightCard">
-              <div class="spotlight-top-bar">
-                <div class="spotlight-badge">
-                  <span class="pulse-spark"></span>
-                  <span>ЛУЧШИЙ КАНДИДАТ</span>
-                </div>
-                <div class="spotlight-rank-pill">Ранг #1</div>
-              </div>
-
-              <!-- Camera Trajectory Route Visualization -->
-              <div class="camera-trajectory-bar" id="spotlightTrajBar">
-                <div class="traj-node">
-                  <span class="traj-sub">Камера запроса</span>
-                  <span class="traj-name" id="spotlightQueryCam">Камера #—</span>
-                </div>
-                <div class="traj-flow">
-                  <div class="traj-line"></div>
-                  <div class="traj-flow-pulse"></div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </div>
-                <div class="traj-node match">
-                  <span class="traj-sub">Камера фиксации</span>
-                  <span class="traj-name match" id="spotlightMatchCam">Камера #—</span>
-                </div>
-              </div>
-
-              <div class="spotlight-grid">
-                <div class="spotlight-visual">
-                  <img id="spotlightImg" src="" alt="Лучший кандидат" loading="lazy">
-                  <div class="zoom-lens-badge" title="Увеличение при наведении">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-                    <span>Зум</span>
-                  </div>
-                  <button class="btn-compare-spotlight" id="btnCompareSpotlight" title="Сравнить шторкой с запросом">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg>
-                    <span>Сравнить шторкой</span>
-                  </button>
-                </div>
-                <div class="spotlight-info">
-                  <div class="spotlight-score-block">
-                    <div class="score-number-group">
-                      <div class="circular-gauge-wrap">
-                        <svg class="circular-gauge" viewBox="0 0 36 36">
-                          <path class="gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                          <path class="gauge-stroke" id="gaugeStroke" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                        </svg>
-                        <span class="gauge-perc-label" id="spotlightGaugePerc">0%</span>
-                      </div>
-                      <div class="score-text-col">
-                        <span class="score-large" id="spotlightScore">0.000</span>
-                        <span class="score-label">косинусная близость</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="spotlight-details-list">
-                    <div class="detail-row">
-                      <span class="detail-key">ID в галерее:</span>
-                      <span class="detail-val mono" id="spotlightId">#—</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-key">Вердикт уверенности:</span>
-                      <span class="detail-val confidence-tag ok" id="spotlightConf">Высокая</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Filter & Sort Strip for Candidates -->
-            <div class="results-toolbar hidden" id="resultsToolbar">
-              <div class="filter-chips">
-                <button class="filter-chip active" data-filter="all" id="chipFilterAll">Все (<span id="countAll">0</span>)</button>
-                <button class="filter-chip" data-filter="accepted" id="chipFilterAccepted">Выше порога (<span id="countAccepted">0</span>)</button>
-              </div>
-              <div class="legend-row">
-                <span class="legend-item"><i class="dot ok"></i> > 0.60 Высокая</span>
-                <span class="legend-item"><i class="dot mid"></i> 0.30–0.60 Средняя</span>
-                <span class="legend-item"><i class="dot low"></i> < 0.30 Отказ</span>
-              </div>
-            </div>
-
-            <!-- Candidates Grid -->
-            <div class="candidates-grid" id="candidatesGrid">
-              <div class="empty-state-card">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                <p>Результаты ранжирования появятся здесь после запуска поиска</p>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ============================================== -->
-    <!-- SCREEN 2: ГАЛЕРЕЯ (GALLERY)                    -->
-    <!-- ============================================== -->
-    <section id="view-gallery" class="view-panel">
-      <div class="gallery-layout">
-        
-        <!-- TOP STATS ROW -->
-        <div class="stats-row">
-          
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-purple">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            </div>
-            <div class="stat-meta">
-              <span class="stat-label">Всего ТС в базе</span>
-              <span class="stat-number" id="gStatCount">—</span>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-magenta">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            </div>
-            <div class="stat-meta">
-              <span class="stat-label">Индекс поиска</span>
-              <span class="stat-number" id="gStatIndex">Flat Cosine</span>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-lavender">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
-            </div>
-            <div class="stat-meta">
-              <span class="stat-label">Вычислитель</span>
-              <span class="stat-number" id="gStatProvider">CPU</span>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon-wrap icon-green">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-            </div>
-            <div class="stat-meta">
-              <span class="stat-label">Размерность отпечатка</span>
-              <span class="stat-number" id="gStatDim">2304 D</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- ACTIONS & MANAGEMENT -->
-        <div class="gallery-management-card card">
-          <div class="management-grid">
-            
-            <!-- Left: Batch Operations -->
-            <div class="batch-ops">
-              <span class="eyebrow">УПРАВЛЕНИЕ ДЕМО-БАЗОЙ</span>
-              <div class="btn-group-row">
-                <button class="btn-primary" id="btnDemoLoad">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  <span>Загрузить тестовую галерею</span>
-                </button>
-                <button class="btn-danger-outline" id="btnGalleryClear">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  <span>Очистить базу</span>
-                </button>
-              </div>
-
-              <!-- Animated Loading Progress Bar -->
-              <div class="demo-progress-box hidden" id="demoProgressBox">
-                <div class="progress-labels">
-                  <span id="demoProgressTitle">Загрузка галереи…</span>
-                  <span class="progress-perc" id="demoProgressPerc">0%</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" id="demoProgressFill" style="width: 0%;"></div>
-                </div>
-                <span class="progress-details" id="demoProgressText">0 / 750 объектов</span>
-              </div>
-            </div>
-
-            <!-- Right: Add Current Vehicle to Gallery -->
-            <div class="add-vehicle-section">
-              <span class="eyebrow">ДОБАВИТЬ ТС В ГАЛЕРЕЮ</span>
-              <p class="section-hint">Использует выбранный кадр и рамку со вкладки «Поиск»</p>
-              <div class="add-form-row">
-                <input type="text" id="inputAddLabel" class="app-input" placeholder="Подпись / госномер (необязательно)">
-                <input type="number" id="inputAddCamera" class="app-input input-cam" placeholder="Кам. №">
-                <button class="btn-outline" id="btnAddVehicle">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  <span>Добавить</span>
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- GALLERY BROWSER & GRID -->
-        <div class="card gallery-items-card">
-          <div class="card-header">
-            <div class="header-left">
-              <span class="eyebrow">ОБЪЕКТЫ В БАЗЕ</span>
-              <h3 class="card-subtitle">Сетка цифровых признаков ТС</h3>
-            </div>
-            <div class="gallery-search-box">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" id="inputGallerySearch" placeholder="Фильтр по ID или камере…">
-            </div>
-          </div>
-
-          <div class="gallery-grid" id="galleryGrid">
-            <div class="spinner-center">
-              <div class="spinner-sm"></div>
-              <span>Загрузка объектов галереи…</span>
-            </div>
-          </div>
-
-          <div class="gallery-pagination-row">
-            <button class="btn-outline-sm" id="btnGalleryPrev" disabled>← Предыдущие</button>
-            <span class="pagination-page-label" id="galleryPageLabel">Объекты 1–50</span>
-            <button class="btn-outline-sm" id="btnGalleryNext">Следующие →</button>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ============================================== -->
-    <!-- SCREEN 3: О МОДЕЛИ (INFO & ARCHITECTURE)      -->
-    <!-- ============================================== -->
-    <section id="view-info" class="view-panel">
-      <div class="info-layout">
-        
-        <div class="card info-hero-card">
-          <div class="eyebrow">ЛЦТ 2026 · ЗАДАЧА 7</div>
-          <h1 class="info-hero-title">Цифровой признак автомобиля без госномера</h1>
-          <p class="info-hero-lead">
-            Городские камеры видеонаблюдения фиксируют тысячи транспортных средств в условиях грязи, бликов, неблагоприятной погоды и сложных ракурсов, когда госномер нечитаем. Сервис формирует инвариантный цифровой отпечаток автомобиля и мгновенно находит его проезды по другим камерам городской инфраструктуры.
-          </p>
-        </div>
-
-        <div class="info-features-grid">
-          
-          <div class="card feature-box">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            </div>
-            <h3>Ансамбль нейросетей</h3>
-            <p>
-              Эмбеддинг формируется объединением признаков двух передовых Vision-архитектур: <strong>DINOv2 ViT-B/14</strong> (трансформер внимания к глобальным пропорциям) + <strong>DINOv3 ConvNeXt-S</strong> (сверточная точность текстур и локальных деталей).
-            </p>
-          </div>
-
-          <div class="card feature-box">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><line x1="2" y1="12" x2="22" y2="12"></line></svg>
-            </div>
-            <h3>2304-мерный признак</h3>
-            <p>
-              Каждое изображение сжимается в нормализованный вектор размерности 2304. Сравнение выполняется через косинусное сходство (скалярное произведение), обеспечивая поиск за миллисекунды даже среди миллиона объектов.
-            </p>
-          </div>
-
-          <div class="card feature-box">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            </div>
-            <h3>Обоснованный порог 0.30</h3>
-            <p>
-              Калиброванный порог отказа 0.30 минимизирует ложные срабатывания (FAR). Если сходство с лучшим кандидатом ниже 0.30, система честно возвращает статус отказа (Refused), защищая оператора от ошибок.
-            </p>
-          </div>
-
-          <div class="card feature-box">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </div>
-            <h3>Кросс-камерная фильтрация</h3>
-            <p>
-              Фон снимка позволяет автоматически определить ID исходной камеры (<code>query_camera</code>). Опция кросс-камерной фильтрации исключает повторные кадры того же автомобиля на исходном перекрёстке.
-            </p>
-          </div>
-
-        </div>
-
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ============================================== -->
-  <!-- MODAL: SIDE-BY-SIDE INSPECTOR & ATTENTION MAP  -->
-  <!-- ============================================== -->
-  <div class="app-modal-backdrop hidden" id="compareModal">
-    <div class="modal-dialog compare-dialog">
-      
-      <div class="modal-header">
-        <div class="modal-title-group">
-          <span class="eyebrow">ДЕТАЛЬНОЕ СРАВНЕНИЕ И АНАЛИЗ</span>
-          <h2 class="modal-title">Сравнение: Запрос vs Кандидат</h2>
-        </div>
-        <button class="modal-close-btn" id="btnCloseCompareModal" title="Закрыть (Esc)">✕</button>
-      </div>
-
-      <div class="modal-body">
-        
-        <!-- Interactive Attention Heatmap Toggle (Section 7) -->
-        <div class="attention-map-bar hidden" id="attentionBar">
-          <div class="attention-toggle-col">
-            <label class="toggle-switch">
-              <input type="checkbox" id="checkAttentionHeatmap">
-              <span class="slider round"></span>
-            </label>
-            <div class="toggle-text">
-              <span class="toggle-title">Карта внимания модели (Attention Map)</span>
-              <span class="toggle-desc">Вклад каждого участка машины в сходство (дообученная ViT-модель, участки 14×14 px)</span>
-            </div>
-          </div>
-          <div class="attention-opacity-col hidden" id="attentionOpacityWrapper">
-            <span>Прозрачность карты:</span>
-            <input type="range" id="rangeAttentionOpacity" min="0.1" max="0.9" step="0.05" value="0.55" class="app-range-sm">
-          </div>
-        </div>
-
-        <!-- View Mode Switcher: Split Slider vs Side-by-side -->
-        <div class="compare-mode-nav">
-          <div class="compare-mode-chips">
-            <button class="mode-chip active" id="btnModeCurtain" data-mode="curtain">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-              <span>Интерактивная шторка</span>
-            </button>
-            <button class="mode-chip" id="btnModeDual" data-mode="dual">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="9" height="18" rx="2"/><rect x="13" y="3" width="9" height="18" rx="2"/></svg>
-              <span>Бок о бок</span>
-            </button>
-          </div>
-          <span class="compare-hint-tag" id="compareHintText">Тяните разделитель шторки для наложения контуров</span>
-        </div>
-
-        <!-- Mode A: Interactive Curtain / Split Slider -->
-        <div class="split-slider-container" id="splitSliderContainer">
-          <div class="split-image-layer under-layer">
-            <img id="curtainCandidateImg" src="" alt="Кандидат">
-            <span class="curtain-label right">Кандидат (<span id="curtainCandId">#—</span>)</span>
-            <div class="heatmap-overlay hidden" id="curtainCandidateHeatmap"></div>
-          </div>
-          <div class="split-image-layer over-layer" id="curtainOverLayer" style="clip-path: inset(0 50% 0 0);">
-            <img id="curtainQueryImg" src="" alt="Запрос">
-            <span class="curtain-label left">Запрос (кадр)</span>
-            <div class="heatmap-overlay hidden" id="curtainQueryHeatmap"></div>
-          </div>
-          <div class="split-slider-handle" id="splitSliderHandle" style="left: 50%;">
-            <div class="handle-line"></div>
-            <div class="handle-thumb">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="8 17 3 12 8 7"/><polyline points="16 17 21 12 16 7"/></svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mode B: Side-by-Side Dual View (Hidden by default, can be toggled) -->
-        <div class="compare-dual-view hidden" id="compareDualView">
-          
-          <!-- Left: Query Crop -->
-          <div class="compare-card">
-            <div class="compare-card-label">
-              <span class="badge-role query">Кадр-запрос</span>
-              <span id="compareQueryCam">Камера #—</span>
-            </div>
-            <div class="compare-img-wrap">
-              <img id="compareQueryImg" src="" alt="Кадр-запрос">
-              <div class="heatmap-overlay hidden" id="queryHeatmap"></div>
-            </div>
-          </div>
-
-          <!-- Center: Match Metrics -->
-          <div class="compare-center-metrics">
-            <div class="sim-badge" id="compareSimBadge">
-              <span class="sim-val" id="compareSimVal">0.000</span>
-              <span class="sim-title">Близость</span>
-            </div>
-            <div class="cam-transition-arrow">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-            </div>
-            <div class="verdict-tag" id="compareVerdictTag">Выше порога</div>
-          </div>
-
-          <!-- Right: Candidate Crop -->
-          <div class="compare-card">
-            <div class="compare-card-label">
-              <span class="badge-role candidate">Кандидат из галереи</span>
-              <span id="compareCandidateCam">Камера #—</span>
-            </div>
-            <div class="compare-img-wrap">
-              <img id="compareCandidateImg" src="" alt="Кандидат">
-              <div class="heatmap-overlay hidden" id="candidateHeatmap"></div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Meta Table -->
-        <div class="compare-meta-table">
-          <div class="meta-item">
-            <span class="meta-label">ID объекта</span>
-            <span class="meta-val mono" id="compareId">#—</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Хэш метки (Label)</span>
-            <span class="meta-val mono" id="compareLabel">—</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Камера запроса</span>
-            <span class="meta-val" id="compareCamQueryVal">—</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Камера совпадения</span>
-            <span class="meta-val highlight-cam" id="compareCamMatchVal">—</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Статус фильтра</span>
-            <span class="meta-val" id="compareAcceptedVal">Принят</span>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-outline" id="btnExportComparePair">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Экспорт этой пары</span>
-        </button>
-        <button class="btn-primary" id="btnModalCloseAction">Закрыть</button>
-      </div>
-
+<header class="top">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8"/><path d="M8 20l2.4-6.2A2.5 2.5 0 0 1 12.7 12h6.6a2.5 2.5 0 0 1 2.3 1.8L24 20v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z"/><circle cx="11.5" cy="19" r="1.2"/><circle cx="20.5" cy="19" r="1.2"/></svg>
+    <div>
+      <b>ReID</b>
+      <span>поиск машины по камерам без госномера</span>
     </div>
   </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="search" aria-selected="true">Поиск</button>
+    <button role="tab" data-tab="gallery" aria-selected="false">Галерея</button>
+    <button role="tab" data-tab="about" aria-selected="false">О решении</button>
+  </nav>
+  <div class="status">
+    <span class="chip" id="stState"><i class="dot"></i><span>подключение…</span></span>
+    <span class="chip" id="stGallery">— ТС</span>
+    <span class="chip" id="stDevice">—</span>
+    <span class="chip warn hidden" id="stReadonly">только чтение</span>
+    <a class="chip link" href="/api/docs" target="_blank" rel="noopener">API</a>
+    <button class="icon-btn" id="themeBtn" aria-label="Сменить тему"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
+  </div>
+</header>
 
-  <!-- ============================================== -->
-  <!-- MODAL: CONFIRMATION (NO BROWSER CONFIRM)        -->
-  <!-- ============================================== -->
-  <div class="app-modal-backdrop hidden" id="confirmModal">
-    <div class="modal-dialog confirm-dialog">
-      <div class="modal-header">
-        <div class="confirm-icon-wrap">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF0053" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+<main>
+  <!-- ==================== ПОИСК ==================== -->
+  <section id="tab-search" class="tab-page">
+    <div class="col-left">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="eyebrow">1 · кадр-запрос</div>
+            <h2>Выберите машину на кадре</h2>
+          </div>
+          <div class="actions">
+            <label class="btn ghost" for="fileInput">Загрузить фото<input type="file" id="fileInput" accept="image/jpeg,image/png"></label>
+            <button class="btn ghost" id="wholeBtn" disabled>Весь кадр</button>
+          </div>
         </div>
-        <h3 class="modal-title" id="confirmTitle">Подтверждение действия</h3>
+        <div class="stage" id="stage">
+          <div class="stage-empty" id="stageEmpty">
+            <p>Перетащите фото сюда, загрузите файл или выберите пример ниже</p>
+          </div>
+          <img id="frame" alt="кадр-запрос" hidden>
+          <svg id="overlay" hidden></svg>
+          <div class="stage-busy hidden" id="stageBusy"><span class="spinner"></span>ищем машины на кадре…</div>
+        </div>
+        <div class="stage-info" id="stageInfo">Машины на кадре определяются автоматически; свою рамку можно нарисовать мышью.</div>
       </div>
-      <div class="modal-body">
-        <p class="confirm-message" id="confirmMessage">Вы уверены, что хотите выполнить данное действие?</p>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="eyebrow">примеры</div>
+            <h2>Кадры из тестовой выборки</h2>
+          </div>
+          <span class="muted" id="samplesCount"></span>
+        </div>
+        <div class="samples" id="samples"></div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-ghost" id="btnConfirmCancel">Отмена</button>
-        <button class="btn-danger" id="btnConfirmOk">Да, подтвердить</button>
+
+      <div class="card controls">
+        <div class="ctrl">
+          <label for="thr">Порог отказа <b id="thrVal">0.30</b></label>
+          <input type="range" id="thr" min="0" max="0.9" step="0.01" value="0.30">
+          <small>ниже порога — «уверенного совпадения нет»; 0.30 обоснован в README</small>
+        </div>
+        <div class="ctrl">
+          <label for="topk">Кандидатов <b id="topkVal">10</b></label>
+          <input type="range" id="topk" min="3" max="30" step="1" value="10">
+        </div>
+        <label class="switch"><input type="checkbox" id="xcam" checked><span></span>только другие камеры</label>
+        <button class="btn primary" id="goBtn" disabled><span class="spinner hidden"></span><span class="lbl">Найти машину</span></button>
       </div>
     </div>
+
+    <div class="col-right">
+      <div class="card verdict idle" id="verdict">
+        <div class="eyebrow">2 · результат</div>
+        <div class="verdict-body">
+          <div class="ring" id="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="val" id="ringVal"/></svg><b id="ringNum">—</b></div>
+          <div class="verdict-text">
+            <h2 id="vTitle">Ожидание запроса</h2>
+            <p id="vSub">Выберите машину на кадре и нажмите «Найти машину».</p>
+            <div class="route hidden" id="route"><span id="routeFrom">кам. —</span><i></i><span id="routeTo">кам. —</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card compare hidden" id="compare">
+        <div class="card-head">
+          <div>
+            <div class="eyebrow">сравнение</div>
+            <h2 id="cmpTitle">Запрос и кандидат №1</h2>
+          </div>
+          <label class="switch" id="heatSwitch"><input type="checkbox" id="heatToggle"><span></span>карта внимания</label>
+        </div>
+        <div class="pair">
+          <figure>
+            <div class="shot" id="shotQ"><img id="imgQ" alt="запрос"><div class="heat" id="heatQ"></div></div>
+            <figcaption>запрос · <span id="camQ">кам. —</span></figcaption>
+          </figure>
+          <div class="pair-mid"><b id="cmpScore">—</b><small>близость</small><span class="pill" id="cmpPill">—</span></div>
+          <figure>
+            <div class="shot" id="shotC"><img id="imgC" alt="кандидат"><div class="heat" id="heatC"></div></div>
+            <figcaption>кандидат #<span id="idC">—</span> · <span id="camC">кам. —</span></figcaption>
+          </figure>
+        </div>
+        <div class="heat-bar hidden" id="heatBar">
+          <span>прозрачность</span><input type="range" id="heatOpacity" min="0.1" max="1" step="0.05" value="0.7">
+          <small id="heatNote">вклад каждого участка 14×14 px в близость дообученной ViT-модели: яркое — детали, давшие совпадение</small>
+        </div>
+      </div>
+
+      <div class="card results hidden" id="results">
+        <div class="card-head">
+          <div>
+            <div class="eyebrow">кандидаты</div>
+            <h2 id="resTitle">Похожие машины с других камер</h2>
+          </div>
+          <div class="actions">
+            <button class="btn ghost sm" id="expJson">JSON</button>
+            <button class="btn ghost sm" id="expCsv">CSV</button>
+          </div>
+        </div>
+        <div class="legend"><span class="b hi"></span>&gt; 0.60 высокая<span class="b mid"></span>0.30–0.60 средняя<span class="b lo"></span>&lt; порога</div>
+        <div class="grid" id="grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ГАЛЕРЕЯ ==================== -->
+  <section id="tab-gallery" class="tab-page hidden">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">база</div>
+          <h2 id="galTitle">Галерея</h2>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="galLoadDemo">Загрузить тестовую галерею</button>
+          <button class="btn danger" id="galClear">Очистить</button>
+        </div>
+      </div>
+      <p class="muted" id="galInfo"></p>
+      <div class="grid gallery" id="galGrid"></div>
+      <div class="more"><button class="btn ghost" id="galMore">Показать ещё</button></div>
+    </div>
+  </section>
+
+  <!-- ==================== О РЕШЕНИИ ==================== -->
+  <section id="tab-about" class="tab-page hidden">
+    <div class="card about">
+      <div class="eyebrow">как это работает</div>
+      <h2>Цифровой отпечаток машины вместо номера</h2>
+      <ol class="steps">
+        <li><b>Рамка</b><span>машина вырезается по рамке (детектор находит её сам)</span></li>
+        <li><b>Две нейросети</b><span>DINOv2 ViT-B и DINOv3 ConvNeXt-S, дообученные на машинах, дают отпечаток из 2304 чисел</span></li>
+        <li><b>Камера по фону</b><span>машина закрашивается, по фону кадра определяется камера; кадры той же камеры не мешают поиску</span></li>
+        <li><b>Поиск</b><span>ближайшие отпечатки в базе FAISS; уверенность — косинусная близость</span></li>
+        <li><b>Решение</b><span>кандидат с уверенностью или честный отказ ниже порога 0.30</span></li>
+      </ol>
+      <div class="kpis">
+        <div><b>0.766</b><span>mAP@10</span></div>
+        <div><b>73.5%</b><span>верная машина первой</span></div>
+        <div><b>89.4%</b><span>в первой пятёрке</span></div>
+        <div><b>702 МБ</b><span>все веса, офлайн</span></div>
+      </div>
+      <p class="muted">Валидация на машинах, которых модель не видела. Код, метрики и обоснование порога — <a href="https://github.com/vexi1es/ReID" target="_blank" rel="noopener">github.com/vexi1es/ReID</a>. Команда DreamCore, ЛЦТ 2026, задача 7 (Фалькон Тех).</p>
+    </div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<div class="modal hidden" id="confirm" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h3 id="confirmTitle">Подтвердите</h3>
+    <p id="confirmText"></p>
+    <div class="actions"><button class="btn ghost" id="confirmNo">Отмена</button><button class="btn danger" id="confirmYes">Удалить</button></div>
   </div>
+</div>
 
-  <!-- ============================================== -->
-  <!-- TOAST NOTIFICATIONS CONTAINER                  -->
-  <!-- ============================================== -->
-  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-
-  <!-- Scripts -->
-  <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

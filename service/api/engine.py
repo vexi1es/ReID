@@ -56,6 +56,9 @@ class Engine:
             self.models.append((sess, m["size"], np.sqrt(m["weight"] / total), m["onnx"]))
         self.bg = ort.InferenceSession(f"{weights}/bg.onnx", opts, providers=self.providers)
         self.bank = dict(np.load(f"{weights}/cam_bank.npz"))
+        # детектор ТС для автоопределения рамки в интерфейсе (необязателен)
+        det = f"{weights}/detector.onnx"
+        self.detector = ort.InferenceSession(det, opts, providers=self.providers) if os.path.exists(det) else None
         self.threshold = float(os.environ.get("THRESHOLD", THRESHOLD))
 
     def _vehicle(self, crop, size):
@@ -141,8 +144,52 @@ def explain(engine, q_crop, c_crop, side=448):
         h = np.maximum(h, 0).reshape(g, g)
         top = np.percentile(h, 99) or 1.0      # отдельные «шумные» токены DINOv2 не забивают шкалу
         h = np.clip(h / top, 0, 1)
-        out[key] = {"image": _jpeg(crop, side), "heat": _colorize(h, side)}
+        out[key] = {"image": _jpeg(crop, side), "heat": _colorize(h, side),
+                    "aspect": round(crop.size[0] / max(1, crop.size[1]), 4)}   # w/h: показать без искажений
     out["similarity_vit"] = float(emb[0] @ emb[1])
     out["method"] = ("вклад каждого участка кадра в косинусную близость дообученной ViT-модели "
                      "(разложение сходства по патчам 14x14 px)")
     return out
+
+
+VEHICLE = {3: "легковой", 4: "мотоцикл", 6: "автобус", 8: "грузовик"}   # классы COCO
+
+
+def detect(engine, img, min_score=0.5, max_n=12):
+    """Машины на кадре: [{x, y, w, h, score, kind}] в пикселях исходного кадра, крупные — первыми.
+    Faster R-CNN MobileNetV3 (torchvision, COCO) на кадре 960x540 с полями."""
+    if engine.detector is None:
+        return []
+    img = img.convert("RGB")
+    W, H = img.size
+    s = min(960 / W, 540 / H)
+    small = img.resize((max(1, int(W * s)), max(1, int(H * s))), Image.BILINEAR)
+    canvas = np.zeros((540, 960, 3), np.float32)
+    canvas[:small.size[1], :small.size[0]] = np.asarray(small, np.float32) / 255
+    try:
+        boxes, labels, scores = engine.detector.run(None, {"image": canvas.transpose(2, 0, 1).copy()})
+    except Exception:          # экспорт torchvision падает, если на кадре нет ни одного объекта
+        return []
+    out = []
+    for b, lab, sc in zip(boxes / s, labels, scores):
+        if int(lab) in VEHICLE and sc >= min_score:
+            x0, y0, x1, y1 = [float(v) for v in b]
+            x0, y0, x1, y1 = max(0, x0), max(0, y0), min(W, x1), min(H, y1)
+            if x1 - x0 >= 16 and y1 - y0 >= 16:
+                out.append({"x": round(x0), "y": round(y0), "w": round(x1 - x0), "h": round(y1 - y0),
+                            "score": round(float(sc), 3), "kind": VEHICLE[int(lab)]})
+    # одна машина иногда находится дважды (разными классами) — оставляем более уверенную рамку
+    out.sort(key=lambda r: -r["score"])
+    keep = []
+    for r in out:
+        if all(_iou(r, k) < 0.55 for k in keep):
+            keep.append(r)
+    keep.sort(key=lambda r: -r["w"] * r["h"])
+    return keep[:max_n]
+
+
+def _iou(a, b):
+    ix = max(0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+    iy = max(0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+    inter = ix * iy
+    return inter / (a["w"] * a["h"] + b["w"] * b["h"] - inter or 1)

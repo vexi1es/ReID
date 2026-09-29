@@ -135,3 +135,17 @@ def test_explain_heatmap(client):
     assert j["similarity_vit"] > 0.99
     assert c.post("/api/explain", files={"file": ("f.jpg", data, "image/jpeg")},
                   data=_form(bbox, gallery_id=987654)).status_code == 404
+
+
+def test_detect(client):
+    c, app_module = client
+    data, _ = _sample_jpeg()
+    r = c.post("/api/detect", files={"file": ("f.jpg", data, "image/jpeg")})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["width"] > 0 and isinstance(j["vehicles"], list)
+    for v in j["vehicles"]:
+        assert v["w"] >= 16 and v["h"] >= 16 and 0 <= v["score"] <= 1
+    blank = io.BytesIO()
+    Image.new("RGB", (640, 360)).save(blank, "JPEG")
+    assert c.post("/api/detect", files={"file": ("b.jpg", blank.getvalue(), "image/jpeg")}).json()["vehicles"] == []

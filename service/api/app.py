@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
-from engine import Engine, crop_box, explain as explain_pair, validate_bbox
+from engine import Engine, crop_box, detect as detect_vehicles, explain as explain_pair, validate_bbox
 from store import Store
 
 WEIGHTS = os.environ.get("WEIGHTS", "weights")
@@ -94,7 +94,7 @@ def embed_or_400(img, bbox):
 
 @app.get("/api/health", summary="Состояние сервиса")
 def health():
-    return {"status": "ok", "gallery": store.count(), "readonly": READONLY, "explain": engine.explainer is not None, "index": store.kind, "providers": engine.providers,
+    return {"status": "ok", "gallery": store.count(), "readonly": READONLY, "explain": engine.explainer is not None, "detect": engine.detector is not None, "index": store.kind, "providers": engine.providers,
             "models": [m[3] for m in engine.models], "threshold": engine.threshold, "dim": store.dim}
 
 
@@ -127,6 +127,15 @@ def search(file: UploadFile = File(..., description="кадр JPEG/PNG"),
     cands = [r for r in ranking[:1] if r.accepted]
     return SearchResult(refused=not cands, threshold=thr, query_camera=cam, candidates=cands,
                         ranking=ranking, ms=round((time.time() - t0) * 1000, 1))
+
+
+@app.post("/api/detect", summary="Найти машины на кадре (автоопределение рамки)")
+def detect(file: UploadFile = File(..., description="кадр JPEG/PNG")):
+    img = read_image(file)
+    t0 = time.time()
+    boxes = detect_vehicles(engine, img)
+    return {"width": img.size[0], "height": img.size[1], "vehicles": boxes,
+            "ms": round((time.time() - t0) * 1000, 1), "available": engine.detector is not None}
 
 
 @app.post("/api/explain", summary="Карта внимания: какие участки машин дали сходство")
