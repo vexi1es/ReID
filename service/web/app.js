@@ -6,7 +6,7 @@
   const S = {
     img: null, blob: null, W: 0, H: 0, bbox: null, dets: [], sampleId: null,
     result: null, active: 0, explain: new Map(), readonly: false, canExplain: false,
-    galOffset: 0, galLimit: 60, queryCrop: null, queryAspect: 1, token: 0,
+    galOffset: 0, galLimit: 60, queryCrop: null, queryAspect: 1, token: 0, drawMode: false,
   };
 
   // ---------------------------------------------------------------- утилиты
@@ -95,7 +95,7 @@
   async function setFrame(blob, preset, sampleId = null) {
     const token = ++S.token;
     S.blob = blob; S.sampleId = sampleId; S.dets = []; S.bbox = preset || null;
-    S.explain.clear();
+    S.explain.clear(); setDrawMode(false); renderDets();
     const url = URL.createObjectURL(blob);
     await new Promise((ok, fail) => { frame.onload = ok; frame.onerror = fail; frame.src = url; })
       .catch(() => { throw new Error("не удалось открыть изображение"); });
@@ -103,8 +103,9 @@
     S.img = frame; S.W = frame.naturalWidth; S.H = frame.naturalHeight;
     frame.hidden = false; svg.hidden = false; $("#stageEmpty").classList.add("hidden");
     svg.setAttribute("viewBox", `0 0 ${S.W} ${S.H}`);
-    $("#wholeBtn").disabled = false;
+    $("#wholeBtn").disabled = $("#drawBtn").disabled = false;
     updateCrop(); draw(); readyState();
+    $("#stageInfo").textContent = "Ищем машины на кадре…";
     $("#stageBusy").classList.remove("hidden");
     try {
       const f = new FormData();
@@ -115,21 +116,61 @@
       if (!S.bbox && S.dets.length) S.bbox = { ...S.dets[0] };
       info(d);
     } catch (e) {
-      if (token === S.token) $("#stageInfo").textContent = `Автоопределение недоступно (${e.message}); нарисуйте рамку мышью.`;
+      if (token === S.token) $("#stageInfo").textContent = `Автоопределение недоступно (${e.message}) — нажмите «Своя рамка» и обведите машину.`;
     } finally {
       if (token === S.token) $("#stageBusy").classList.add("hidden");
     }
-    updateCrop(); draw(); readyState();
+    updateCrop(); draw(); readyState(); renderDets();
   }
 
   function info(d) {
     const n = S.dets.length;
     const box = $("#stageInfo");
     box.textContent = "";
-    if (!n) { box.textContent = "Машины не найдены автоматически — нарисуйте рамку мышью вокруг машины."; return; }
+    if (!n) { box.textContent = "Машины не найдены автоматически — нажмите «Своя рамка» и обведите машину."; return; }
     box.append("Найдено машин: ", el("b", null, String(n)), ` за ${Math.round(d.ms)} мс. ` +
-      (n > 1 ? "Нажмите на нужную рамку или нарисуйте свою." : "Можно нарисовать свою рамку."));
+      (n > 1 ? "Выберите нужную — ниже или прямо на кадре." : "Если рамка не та — «Своя рамка»."));
   }
+
+  // найденные машины — крупные кнопки-превью: на телефоне в них легко попасть пальцем
+  function renderDets() {
+    const box = $("#dets");
+    box.textContent = "";
+    box.classList.toggle("hidden", !S.dets.length);
+    S.dets.forEach((d, i) => {
+      const b = el("button", "det-chip");
+      b.type = "button";
+      const cv = document.createElement("canvas");
+      const k = Math.min(1, 200 / Math.max(d.w, d.h));
+      cv.width = Math.max(1, Math.round(d.w * k)); cv.height = Math.max(1, Math.round(d.h * k));
+      try { cv.getContext("2d").drawImage(S.img, d.x, d.y, d.w, d.h, 0, 0, cv.width, cv.height); } catch { /* кадр ещё не готов */ }
+      const th = el("span", "det-thumb"); th.appendChild(cv);
+      b.append(th, el("span", "det-cap", `${i + 1} · ${d.kind} ${Math.round(d.score * 100)}%`));
+      b.onclick = () => choose({ ...d });
+      box.appendChild(b);
+    });
+    syncDets();
+  }
+  function syncDets() {
+    document.querySelectorAll("#dets .det-chip").forEach((b, i) =>
+      b.classList.toggle("active", !!S.bbox && iou(S.dets[i], S.bbox) > 0.6));
+  }
+  function choose(b) {
+    S.bbox = b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) };
+    updateCrop(); draw(); readyState(); syncDets();
+  }
+
+  // режим «своя рамка»: мышью рисовать можно всегда, на сенсорном экране — только в этом режиме,
+  // иначе палец над кадром не даёт прокручивать страницу
+  function setDrawMode(on) {
+    S.drawMode = on;
+    $("#drawBtn").setAttribute("aria-pressed", on);
+    $("#stage").classList.toggle("drawing", on);
+  }
+  $("#drawBtn").onclick = () => {
+    setDrawMode(!S.drawMode);
+    if (S.drawMode) toast("Обведите машину на кадре — мышью или пальцем");
+  };
 
   function draw() {
     svg.textContent = "";
@@ -149,14 +190,15 @@
       r.dataset.i = i;
       svg.appendChild(r);
       const lh = Math.max(26, S.H / 34), fs = lh * 0.68;
-      const txt = `${d.kind} ${Math.round(d.score * 100)}%`;
+      const txt = `${i + 1} · ${d.kind} ${Math.round(d.score * 100)}%`;
+      const lw = txt.length * fs * 0.56 + fs, lx = Math.max(0, Math.min(d.x, S.W - lw));   // подпись не уезжает за край
       const lab = document.createElementNS(NS, "rect");
-      lab.setAttribute("x", d.x); lab.setAttribute("y", Math.max(0, d.y - lh));
-      lab.setAttribute("width", txt.length * fs * 0.56 + fs); lab.setAttribute("height", lh);
+      lab.setAttribute("x", lx); lab.setAttribute("y", Math.max(0, d.y - lh));
+      lab.setAttribute("width", lw); lab.setAttribute("height", lh);
       lab.setAttribute("rx", 4); lab.setAttribute("class", "det-label");
       svg.appendChild(lab);
       const t = document.createElementNS(NS, "text");
-      t.setAttribute("x", d.x + fs * 0.5); t.setAttribute("y", Math.max(0, d.y - lh) + lh * 0.72);
+      t.setAttribute("x", lx + fs * 0.5); t.setAttribute("y", Math.max(0, d.y - lh) + lh * 0.72);
       t.setAttribute("class", "det-text"); t.style.fontSize = `${fs}px`;
       t.textContent = txt;
       svg.appendChild(t);
@@ -195,11 +237,13 @@
   let drag = null;
   svg.addEventListener("pointerdown", ev => {
     if (!S.W) return;
-    svg.setPointerCapture(ev.pointerId);
-    drag = { start: pt(ev), moved: false, prev: S.bbox };
+    const canDraw = ev.pointerType === "mouse" || S.drawMode;
+    if (canDraw) svg.setPointerCapture(ev.pointerId);
+    drag = { start: pt(ev), moved: false, prev: S.bbox, canDraw };
   });
+  svg.addEventListener("pointercancel", () => { if (drag) { S.bbox = drag.prev; drag = null; draw(); } });
   svg.addEventListener("pointermove", ev => {
-    if (!drag) return;
+    if (!drag || !drag.canDraw) return;
     const p = pt(ev), s = drag.start;
     const minMove = S.W / 150;
     if (!drag.moved && Math.hypot(p.x - s.x, p.y - s.y) < minMove) return;
@@ -210,29 +254,45 @@
   svg.addEventListener("pointerup", ev => {
     if (!drag) return;
     const d = drag; drag = null;
-    if (!d.moved) {                               // клик: выбрать найденную машину под курсором
-      const p = pt(ev);
-      const hit = S.dets.filter(b => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h)
+    if (!d.moved) {                               // клик/тап: выбрать найденную машину под пальцем
+      const p = pt(ev), tol = S.W / 60;           // небольшой допуск — по мелкой рамке легко промахнуться
+      const hit = S.dets.filter(b => p.x >= b.x - tol && p.x <= b.x + b.w + tol && p.y >= b.y - tol && p.y <= b.y + b.h + tol)
         .sort((a, b) => a.w * a.h - b.w * b.h)[0];
-      if (hit) S.bbox = { ...hit };
-    } else if (S.bbox.w < 12 || S.bbox.h < 12) {
+      if (hit) choose(hit);
+      return;
+    }
+    if (S.bbox.w < 12 || S.bbox.h < 12) {
       S.bbox = d.prev;
       toast("Рамка слишком маленькая — нарисуйте крупнее", "error");
-    }
-    S.bbox = S.bbox && { x: Math.round(S.bbox.x), y: Math.round(S.bbox.y), w: Math.round(S.bbox.w), h: Math.round(S.bbox.h) };
-    updateCrop(); draw(); readyState();
+    } else setDrawMode(false);
+    choose(S.bbox);
   });
 
-  $("#wholeBtn").onclick = () => { S.bbox = { x: 0, y: 0, w: S.W, h: S.H }; updateCrop(); draw(); readyState(); };
+  $("#wholeBtn").onclick = () => choose({ x: 0, y: 0, w: S.W, h: S.H });
   $("#fileInput").onchange = e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ""; };
   const stage = $("#stage");
   ["dragenter", "dragover"].forEach(n => stage.addEventListener(n, e => { e.preventDefault(); stage.classList.add("drag"); }));
   ["dragleave", "drop"].forEach(n => stage.addEventListener(n, e => { e.preventDefault(); stage.classList.remove("drag"); }));
   stage.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) openFile(f); });
-  function openFile(f) {
-    if (!/^image\/(jpeg|png)$/.test(f.type)) { toast("Нужен файл JPEG или PNG", "error"); return; }
+  async function openFile(f) {
+    if (f.type && !f.type.startsWith("image/")) { toast("Нужна фотография (JPEG, PNG)", "error"); return; }
     document.querySelectorAll(".sample").forEach(x => x.classList.remove("active"));
-    setFrame(f, null).catch(e => toast(e.message, "error"));
+    try { await setFrame(await normalize(f), null); } catch (e) { toast(e.message, "error"); }
+  }
+  // фото с телефона: поворачиваем по EXIF и уменьшаем до 1920 px — сервер получает ровно то, что видно
+  // на экране (иначе рамки детектора не совпадут с кадром), а загрузка идёт в разы быстрее
+  async function normalize(f) {
+    try {
+      const bm = await createImageBitmap(f, { imageOrientation: "from-image" });
+      const k = Math.min(1, 1920 / Math.max(bm.width, bm.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
+      c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+      if (bm.close) bm.close();
+      return await new Promise((ok, fail) => c.toBlob(b => (b ? ok(b) : fail()), "image/jpeg", 0.92));
+    } catch {
+      return f;                                  // браузер не смог — отправляем как есть, сервер повернёт сам
+    }
   }
 
   // кроп запроса для сравнения — ровно та область, что уходит в модель (рамка + 5%)
@@ -262,20 +322,23 @@
       const b = el("button", "sample");
       b.type = "button";
       b.setAttribute("aria-label", `пример ${i + 1}`);
-      const cv = document.createElement("canvas");
-      cv.width = cv.height = 184;
-      b.appendChild(cv);
+      const W = q.width || 1920, H = q.height || 1080;
+      b.style.aspectRatio = `${W} / ${H}`;
+      const im = document.createElement("img");       // уменьшенный кадр (~30 КБ) + рамка машины-запроса
+      im.loading = "lazy"; im.decoding = "async"; im.alt = "";
+      im.onload = () => b.classList.add("loaded");
+      im.src = `${q.url}?w=360`;
+      const bx = el("span", "sample-box");
+      Object.assign(bx.style, { left: `${q.x / W * 100}%`, top: `${q.y / H * 100}%`, width: `${q.w / W * 100}%`, height: `${q.h / H * 100}%` });
+      b.append(im, bx);
       box.appendChild(b);
-      let blobP = null;
-      const getBlob = () => (blobP = blobP || fetch(q.url).then(r => r.blob()));
-      getBlob().then(bl => createImageBitmap(bl)).then(im => {       // превью — сама машина по рамке
-        const s = Math.max(q.w, q.h) * 1.1, cx = q.x + q.w / 2, cy = q.y + q.h / 2;
-        cv.getContext("2d").drawImage(im, cx - s / 2, cy - s / 2, s, s, 0, 0, 184, 184);
-      }).catch(() => {});
       b.onclick = async () => {
         document.querySelectorAll(".sample").forEach(x => x.classList.toggle("active", x === b));
-        try { await setFrame(await getBlob(), { x: q.x, y: q.y, w: q.w, h: q.h }, q.image_id); }
+        b.classList.add("busy");
+        try { await setFrame(await fetch(q.url).then(r => r.blob()), { x: q.x, y: q.y, w: q.w, h: q.h }, q.image_id); }
         catch (e) { toast(e.message, "error"); }
+        finally { b.classList.remove("busy"); }
+        if (innerWidth < 1080) $("#stage").scrollIntoView({ behavior: "smooth", block: "start" });
       };
     });
     if (list.length && location.hash === "#demo") {
@@ -308,6 +371,7 @@
       setVerdict(r);
       renderGrid(r);
       if (r.ranking.length) select(0); else $("#compare").classList.add("hidden");
+      if (innerWidth < 1080) $("#verdict").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       setVerdict({ error: e.message });
       toast(e.message, "error");
@@ -428,13 +492,15 @@
         h.style.backgroundImage = `url(${part.heat})`;
         h.style.opacity = op;
       }
-      $("#heatNote").textContent = "вклад каждого участка 14×14 px в близость дообученной ViT-модели: яркое — детали, давшие совпадение";
+      $("#heatNote").textContent = HEAT_NOTE;
     } catch (e) {
       $("#heatToggle").checked = false;
       $("#heatBar").classList.add("hidden");
       toast(`Карта внимания: ${e.message}`, "error");
     }
   }
+  const HEAT_NOTE = "Яркое — участки 14×14 px, которые сильнее всего совпали у двух снимков (фары, решётка, колёса, стойки). " +
+    "Точное разложение близости ViT-модели по участкам; показаны 40% самых значимых — слабый ровный вклад фона и асфальта скрыт.";
   $("#heatToggle").onchange = e => {
     if (e.target.checked) showExplain();
     else { $("#heatBar").classList.add("hidden"); showPlain(); }

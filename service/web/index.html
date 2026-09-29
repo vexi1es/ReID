@@ -42,7 +42,8 @@
             <h2>Выберите машину на кадре</h2>
           </div>
           <div class="actions">
-            <label class="btn ghost" for="fileInput">Загрузить фото<input type="file" id="fileInput" accept="image/jpeg,image/png"></label>
+            <label class="btn ghost" for="fileInput">Загрузить фото<input type="file" id="fileInput" accept="image/*"></label>
+            <button class="btn ghost" id="drawBtn" disabled aria-pressed="false">Своя рамка</button>
             <button class="btn ghost" id="wholeBtn" disabled>Весь кадр</button>
           </div>
         </div>
@@ -54,7 +55,8 @@
           <svg id="overlay" hidden></svg>
           <div class="stage-busy hidden" id="stageBusy"><span class="spinner"></span>ищем машины на кадре…</div>
         </div>
-        <div class="stage-info" id="stageInfo">Машины на кадре определяются автоматически; свою рамку можно нарисовать мышью.</div>
+        <div class="stage-info" id="stageInfo">Машины на кадре находятся автоматически — выберите нужную ниже или на кадре.</div>
+        <div class="dets hidden" id="dets" aria-label="найденные машины"></div>
       </div>
 
       <div class="card">
@@ -77,6 +79,7 @@
         <div class="ctrl">
           <label for="topk">Кандидатов <b id="topkVal">10</b></label>
           <input type="range" id="topk" min="3" max="30" step="1" value="10">
+          <small>сколько похожих машин показать в выдаче</small>
         </div>
         <label class="switch"><input type="checkbox" id="xcam" checked><span></span>только другие камеры</label>
         <button class="btn primary" id="goBtn" disabled><span class="spinner hidden"></span><span class="lbl">Найти машину</span></button>
@@ -117,7 +120,7 @@
         </div>
         <div class="heat-bar hidden" id="heatBar">
           <span>прозрачность</span><input type="range" id="heatOpacity" min="0.1" max="1" step="0.05" value="0.7">
-          <small id="heatNote">вклад каждого участка 14×14 px в близость дообученной ViT-модели: яркое — детали, давшие совпадение</small>
+          <small id="heatNote"></small>
         </div>
       </div>
 

@@ -15,8 +15,8 @@ from typing import List, Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
-from PIL import Image, UnidentifiedImageError
+from fastapi.responses import FileResponse, Response
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from engine import Engine, crop_box, detect as detect_vehicles, explain as explain_pair, validate_bbox
@@ -71,7 +71,7 @@ def read_image(file: UploadFile):
         img.load()
     except (UnidentifiedImageError, OSError):
         raise HTTPException(415, "не удалось прочитать изображение (нужен JPEG или PNG)")
-    return img
+    return ImageOps.exif_transpose(img)     # фото с телефона: поворот из EXIF, как его показывает браузер
 
 
 def full_bbox(img, x, y, w, h):
@@ -257,18 +257,32 @@ def demo_queries(limit: int = Query(24, ge=1, le=200), seed: int = Query(0)):
         return []
     q = pd.read_csv(p)
     q = q.sample(min(limit, len(q)), random_state=seed)
-    return [dict(image_id=r.image_id, x=r.x, y=r.y, w=r.w, h=r.h, url=f"/api/demo/image/{r.image_id}")
-            for r in q.itertuples()]
+    out = []
+    for r in q.itertuples():
+        with Image.open(f"{DEMO_DATA}/images/{r.image_id}.jpg") as im:     # читается только заголовок
+            W, H = im.size
+        out.append(dict(image_id=r.image_id, x=r.x, y=r.y, w=r.w, h=r.h, width=W, height=H,
+                        url=f"/api/demo/image/{r.image_id}"))
+    return out
 
 
-@app.get("/api/demo/image/{image_id}", summary="Полный кадр из демо-данных", response_class=FileResponse)
-def demo_image(image_id: str):
+CACHE = {"Cache-Control": "public, max-age=86400"}
+
+
+@app.get("/api/demo/image/{image_id}", summary="Кадр из демо-данных (w — уменьшенное превью)")
+def demo_image(image_id: str, w: int = Query(0, ge=0, le=1920, description="ширина превью, 0 — оригинал")):
     if not image_id.isalnum():
         raise HTTPException(400, "некорректный image_id")
     p = f"{DEMO_DATA}/images/{image_id}.jpg"
     if not os.path.exists(p):
         raise HTTPException(404, "нет кадра")
-    return FileResponse(p, media_type="image/jpeg")
+    if not w:
+        return FileResponse(p, media_type="image/jpeg", headers=CACHE)
+    img = Image.open(p).convert("RGB")
+    img.thumbnail((w, w * 4), Image.BILINEAR)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=78)
+    return Response(buf.getvalue(), media_type="image/jpeg", headers=CACHE)
 
 
 if os.environ.get("WEB_DIR"):       # локальный запуск без nginx: API сам отдаёт веб-интерфейс

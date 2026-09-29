@@ -59,8 +59,21 @@ main { max-width: 1480px; margin: 0 auto; padding: 20px 24px 60px; }
 .tab-page { display: grid; gap: 18px; }
 #tab-search { grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); align-items: start; }
 .col-left, .col-right { display: grid; gap: 18px; min-width: 0; }
-@media (max-width: 1080px) { #tab-search { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { main { padding: 14px 12px 40px; } .top { padding: 10px 12px; } .brand span { display: none; } }
+@media (max-width: 1080px) {
+  #tab-search { grid-template-columns: 1fr; }
+  .col-left > .controls { order: 1; }          /* на узком экране «Найти» — сразу под кадром, примеры ниже */
+  .col-left > .card:has(#samples) { order: 2; }
+}
+@media (max-width: 640px) {
+  main { padding: 14px 12px 40px; }
+  .top { position: static; padding: 10px 12px; gap: 10px; }
+  .brand span { display: none; }
+  .brand { margin-right: 0; flex: 1; }
+  .tabs { order: 3; width: 100%; }
+  .tabs button { flex: 1; padding: 7px 6px; }
+  .status { gap: 6px; }
+  #stGallery, #stDevice { display: none; }
+}
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -86,12 +99,13 @@ h2 { font: 700 18px/1.25 var(--display); margin: 0; text-wrap: balance; }
            animation: spin .7s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; align-items: end; }
-.controls .btn.primary { grid-column: 1 / -1; }
-.ctrl label { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--muted); }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; align-items: start; }
+.controls .switch, .controls .btn.primary { grid-column: 1 / -1; }
+.ctrl { display: grid; gap: 6px; }
+.ctrl label { display: flex; justify-content: space-between; align-items: baseline; font-size: 13.5px; color: var(--muted); }
 .ctrl label b { color: var(--text); font-family: var(--mono); }
-.ctrl small { color: var(--faint); font-size: 12px; }
-input[type=range] { width: 100%; accent-color: var(--accent); }
+.ctrl small { color: var(--faint); font-size: 12px; line-height: 1.4; }
+input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); height: 22px; }
 .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13.5px; color: var(--muted); user-select: none; }
 .switch input { position: absolute; opacity: 0; width: 0; }
 .switch span { width: 38px; height: 22px; border-radius: 999px; background: var(--line-2); position: relative; transition: background .2s; flex: none; }
@@ -99,7 +113,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .switch input:checked + span { background: var(--accent); }
 .switch input:checked + span::after { transform: translateX(16px); }
 .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (max-width: 640px) { .controls { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .controls { grid-template-columns: 1fr; }
+  .card-head .actions { width: 100%; }
+  .card-head .actions .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
+  .btn.primary { padding: 14px 22px; }
+}
 
 /* ---------- сцена с кадром ---------- */
 .stage { position: relative; background: var(--stage); border-radius: 12px; aspect-ratio: 16 / 9; overflow: hidden;
@@ -107,7 +126,21 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .stage.drag { border-color: var(--accent); }
 .stage img, .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .stage img { object-fit: contain; user-select: none; -webkit-user-drag: none; }
-.stage svg { touch-action: none; cursor: crosshair; }
+.stage svg { touch-action: pan-y pinch-zoom; cursor: crosshair; }
+.stage.drawing svg { touch-action: none; }
+.stage.drawing { outline: 2px solid var(--accent); outline-offset: 2px; }
+#drawBtn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* найденные машины — кнопки-превью под кадром */
+.dets { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 4px; scroll-snap-type: x proximity; }
+.det-chip { flex: none; display: grid; gap: 5px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2);
+            cursor: pointer; scroll-snap-align: start; transition: border-color .15s, background .15s; }
+.det-chip:hover { border-color: var(--line-2); }
+.det-chip.active { border-color: var(--accent); background: var(--accent-soft); }
+.det-thumb { width: 104px; height: 78px; border-radius: 7px; background: var(--stage); display: grid; place-items: center; overflow: hidden; }
+.det-thumb canvas { max-width: 100%; max-height: 100%; display: block; }
+.det-cap { font-size: 11.5px; color: var(--muted); text-align: left; white-space: nowrap; }
+.det-chip.active .det-cap { color: var(--accent); font-weight: 600; }
 .stage-empty { color: #8f8aa1; text-align: center; padding: 20px; font-size: 14px; }
 .stage-busy { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; align-items: center; background: rgba(10, 9, 15, .78);
               color: #fff; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; }
@@ -123,13 +156,20 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .sel-corner { fill: var(--accent); }
 .dim { fill: rgba(5, 4, 8, .55); pointer-events: none; }
 
-/* ---------- примеры ---------- */
-.samples { display: grid; grid-auto-flow: column; grid-auto-columns: 92px; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+/* ---------- примеры: уменьшенный кадр + рамка машины ---------- */
+.samples { display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: 10px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
 .sample { position: relative; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; padding: 0;
-          background: var(--surface-2); aspect-ratio: 1; scroll-snap-align: start; transition: border-color .15s; }
-.sample canvas { width: 100%; height: 100%; display: block; }
+          background: var(--surface-2); aspect-ratio: 16 / 9; scroll-snap-align: start; transition: border-color .15s; }
+.sample:not(.loaded) { background: linear-gradient(90deg, var(--surface-2), var(--line), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.sample img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; opacity: 0; transition: opacity .3s; }
+.sample.loaded img { opacity: 1; }
+.sample-box { position: absolute; border: 2px solid var(--accent); border-radius: 3px; box-shadow: 0 0 0 999px rgba(5, 4, 8, .28); pointer-events: none; }
 .sample.active { border-color: var(--accent); }
 .sample:hover { border-color: var(--line-2); }
+.sample.active:hover { border-color: var(--accent); }
+.sample.busy::after { content: ""; position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; border-radius: 50%;
+                      border: 2px solid #fff; border-right-color: transparent; animation: spin .7s linear infinite; }
+@media (max-width: 640px) { .samples { grid-auto-columns: 140px; } }
 
 /* ---------- вердикт ---------- */
 .verdict-body { display: flex; gap: 20px; align-items: center; }
