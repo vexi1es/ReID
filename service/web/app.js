@@ -284,16 +284,22 @@
   // фото с телефона: поворачиваем по EXIF и уменьшаем до 1920 px — сервер получает ровно то, что видно
   // на экране (иначе рамки детектора не совпадут с кадром), а загрузка идёт в разы быстрее
   async function normalize(f) {
+    // через <img>: все браузеры (включая Safari на iPhone) рисуют его на canvas уже с поворотом из EXIF;
+    // createImageBitmap в части браузеров поворот игнорирует — фото уходило боком
+    const url = URL.createObjectURL(f);
     try {
-      const bm = await createImageBitmap(f, { imageOrientation: "from-image" });
-      const k = Math.min(1, 1920 / Math.max(bm.width, bm.height));
+      const im = new Image();
+      im.decoding = "async";
+      await new Promise((ok, fail) => { im.onload = ok; im.onerror = fail; im.src = url; });
+      const k = Math.min(1, 1920 / Math.max(im.naturalWidth, im.naturalHeight));
       const c = document.createElement("canvas");
-      c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
-      c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
-      if (bm.close) bm.close();
+      c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
       return await new Promise((ok, fail) => c.toBlob(b => (b ? ok(b) : fail()), "image/jpeg", 0.92));
     } catch {
       return f;                                  // браузер не смог — отправляем как есть, сервер повернёт сам
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 
