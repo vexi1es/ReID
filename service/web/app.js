@@ -10,14 +10,20 @@
   };
 
   // ---------------------------------------------------------------- утилиты
-  async function api(path, opts = {}) {
+  async function api(path, opts = {}, tries = 3) {
     const res = await fetch(path, opts);
+    // 502–504: сервер перезапускается или просыпается — повторяем через пару секунд
+    if (res.status >= 502 && res.status <= 504 && tries > 1) {
+      await new Promise(r => setTimeout(r, 2500));
+      return api(path, opts, tries - 1);
+    }
     let data = null;
     try { data = await res.json(); } catch { /* не JSON */ }
     if (!res.ok) throw new Error((data && data.detail) || `ошибка ${res.status}`);
     return data;
   }
   function toast(text, kind = "") {
+    if ([...$("#toasts").children].some(x => x.textContent === text)) return;   // одинаковые не копим
     const t = document.createElement("div");
     t.className = `toast ${kind}`;
     t.textContent = text;
@@ -463,6 +469,7 @@
     for (const [shot, img, src] of [["#shotQ", "#imgQ", S.queryCrop], ["#shotC", "#imgC", m && m.crop_url]]) {
       const s = $(shot);
       s.classList.remove("explained"); s.style.width = s.style.height = "";
+      S.shown = null;
       $(img).src = src || "";
       $(".heat", s).style.opacity = 0;
     }
@@ -493,6 +500,7 @@
       }
       if (!$("#heatToggle").checked || S.result.ranking[S.active] !== m) return;
       const op = $("#heatOpacity").value;
+      S.shown = d;
       for (const [shot, img, part] of [["#shotQ", "#imgQ", d.query], ["#shotC", "#imgC", d.candidate]]) {
         sizeShot(shot, part.aspect);
         $(img).src = part.image;                    // квадрат модели растягивается обратно в пропорции кропа
@@ -500,7 +508,9 @@
         h.style.backgroundImage = `url(${part.heat})`;
         h.style.opacity = op;
       }
-      $("#heatNote").textContent = HEAT_NOTE;
+      $("#heatNote").textContent = m.score < S.result.threshold
+        ? "Кандидат ниже порога — скорее всего, это другая машина: совпадать почти нечему, поэтому пятна слабые и могут попасть на фон. " + HEAT_NOTE
+        : HEAT_NOTE;
     } catch (e) {
       $("#heatToggle").checked = false;
       $("#heatBar").classList.add("hidden");
@@ -514,7 +524,16 @@
     else { $("#heatBar").classList.add("hidden"); showPlain(); }
   };
   $("#heatOpacity").oninput = e => document.querySelectorAll(".shot .heat").forEach(h => { if (h.style.backgroundImage) h.style.opacity = e.target.value; });
-  window.addEventListener("resize", () => { if ($("#heatToggle").checked && S.result) showExplain(); });
+  // на телефоне высота окна меняется при прокрутке (прячется адресная строка) — только подгоняем размер,
+  // карту заново не запрашиваем
+  let resizeT = 0;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => {
+      if (!$("#heatToggle").checked || !S.shown) return;
+      sizeShot("#shotQ", S.shown.query.aspect); sizeShot("#shotC", S.shown.candidate.aspect);
+    }, 150);
+  });
 
   // ---------------------------------------------------------------- экспорт
   $("#expJson").onclick = () => S.result && download("reid_result.json", JSON.stringify({ query_bbox: S.bbox, ...S.result }, null, 1), "application/json");
