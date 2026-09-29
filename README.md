@@ -1,6 +1,6 @@
 # Цифровой признак ТС — решение задачи 7 (Фалькон Тех), ЛЦТ 2026
 
-Команда **DreamCore**. Прототип: **https://reid-dreamcore.onrender.com** (демо: https://reid-dreamcore.onrender.com/#demo, API: https://reid-dreamcore.onrender.com/api/docs)
+Команда **DreamCore**. Прототип: **https://shyzo.uz** (демо: https://shyzo.uz/#demo, API: https://shyzo.uz/api/docs; запасной адрес https://reid-dreamcore.onrender.com)
 
 Поиск того же транспортного средства на кадрах других камер без использования
 госномера. На выходе — эмбеддинг ТС (2304 числа), ранжирование галереи и режим
