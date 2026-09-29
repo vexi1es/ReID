@@ -9,6 +9,6 @@ RUN pip install --no-cache-dir -r requirements-infer.txt && \
 
 COPY infer.py .
 COPY reid/__init__.py reid/data.py reid/rerank.py reid/submit.py reid/
-COPY weights/ weights/
+COPY weights/reid.onnx weights/reid_cnx.onnx weights/bg.onnx weights/view.onnx weights/cam_bank.npz weights/meta.json weights/
 
 ENTRYPOINT ["python", "infer.py", "--data", "/data", "--out", "/out"]

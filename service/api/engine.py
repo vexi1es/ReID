@@ -4,6 +4,7 @@
 
 GPU используется, если установлен onnxruntime-gpu и доступна CUDA; иначе CPU.
 """
+import base64
 import io
 import json
 import os
@@ -41,8 +42,18 @@ class Engine:
         self.providers = ort_providers()
         meta = json.load(open(f"{weights}/meta.json"))
         total = sum(m["weight"] for m in meta["models"])
-        self.models = [(ort.InferenceSession(f"{weights}/{m['onnx']}", opts, providers=self.providers),
-                        m["size"], np.sqrt(m["weight"] / total), m["onnx"]) for m in meta["models"]]
+        # reid_explain.onnx — тот же ViT, что reid.onnx (косинус 1.000000), плюс выход «вклады патчей»
+        # для карты внимания; если он есть, берём его вместо reid.onnx, чтобы не держать ViT дважды
+        self.explainer = None
+        self.models = []
+        for m in meta["models"]:
+            name = m["onnx"]
+            if name == "reid.onnx" and os.path.exists(f"{weights}/reid_explain.onnx"):
+                name = "reid_explain.onnx"
+            sess = ort.InferenceSession(f"{weights}/{name}", opts, providers=self.providers)
+            if name == "reid_explain.onnx":
+                self.explainer = (sess, m["size"])
+            self.models.append((sess, m["size"], np.sqrt(m["weight"] / total), m["onnx"]))
         self.bg = ort.InferenceSession(f"{weights}/bg.onnx", opts, providers=self.providers)
         self.bank = dict(np.load(f"{weights}/cam_bank.npz"))
         self.threshold = float(os.environ.get("THRESHOLD", THRESHOLD))
@@ -87,3 +98,51 @@ class Engine:
     def camera(self, img, bbox):
         """Камера по фону кадра (bbox закрашен) — только для камер, известных по train."""
         return self.cameras([self.background(img, bbox)])[0]
+
+
+# палитра тепловой карты: прозрачный -> фиолетовый -> малиновый -> жёлтый (цвета интерфейса)
+_STOPS = np.array([[49, 15, 83], [138, 43, 226], [255, 0, 83], [255, 196, 0]], np.float32)
+
+
+def _colorize(h, side):
+    """h: 16x16 в [0, 1] -> RGBA PNG side x side (data URL)."""
+    img = Image.fromarray((h * 255).astype(np.uint8), "L").resize((side, side), Image.BICUBIC)
+    v = np.asarray(img, np.float32) / 255
+    pos = v * (len(_STOPS) - 1)
+    i = np.clip(pos.astype(int), 0, len(_STOPS) - 2)
+    t = (pos - i)[..., None]
+    rgb = _STOPS[i] * (1 - t) + _STOPS[i + 1] * t
+    alpha = np.clip(v, 0, 1) ** 0.9 * 235
+    rgba = np.concatenate([rgb, alpha[..., None]], -1).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buf, "PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def _jpeg(img, side):
+    buf = io.BytesIO()
+    img.convert("RGB").resize((side, side), Image.BICUBIC).save(buf, "JPEG", quality=88)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def explain(engine, q_crop, c_crop, side=448):
+    """Карта: какие участки запроса и кандидата дали сходство (вклад патча в косинус ViT-ветки)."""
+    if engine.explainer is None:
+        raise RuntimeError("нет weights/reid_explain.onnx")
+    sess, size = engine.explainer
+    x = np.stack([engine._vehicle(q_crop, size), engine._vehicle(c_crop, size)])
+    emb, patches = sess.run(None, {"image": x})
+    d = patches.shape[-1]
+    g = int(round(patches.shape[1] ** 0.5))
+    heat_q = patches[0] @ emb[1, d:]           # вклад участков запроса в сходство с кандидатом
+    heat_c = patches[1] @ emb[0, d:]           # и наоборот
+    out = {}
+    for key, h, crop in (("query", heat_q, q_crop), ("candidate", heat_c, c_crop)):
+        h = np.maximum(h, 0).reshape(g, g)
+        top = np.percentile(h, 99) or 1.0      # отдельные «шумные» токены DINOv2 не забивают шкалу
+        h = np.clip(h / top, 0, 1)
+        out[key] = {"image": _jpeg(crop, side), "heat": _colorize(h, side)}
+    out["similarity_vit"] = float(emb[0] @ emb[1])
+    out["method"] = ("вклад каждого участка кадра в косинусную близость дообученной ViT-модели "
+                     "(разложение сходства по патчам 14x14 px)")
+    return out

@@ -1,0 +1,10 @@
+# Render Blueprint: один Docker web service. Тариф standard (2 ГБ RAM): модели ~1.5 ГБ в памяти.
+services:
+  - type: web
+    name: reid-dreamcore
+    runtime: docker
+    plan: standard
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: false

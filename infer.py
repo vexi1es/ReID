@@ -22,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import onnxruntime as ort
 from PIL import Image, ImageDraw
 
@@ -175,13 +176,22 @@ def main():
     if view:
         # тот же ТС с противоположной стороны похож меньше, чем соседний ТС с той же стороны
         # (VANet, ICCV 2019; VOC-ReID, AI City 2020): бонус парам спереди<->сзади, +0.021 mAP на валидации
-        opp = ((q_view[:, None] == "front") & (g_view[None] == "rear")) |               ((q_view[:, None] == "rear") & (g_view[None] == "front"))
+        opp = (((q_view[:, None] == "front") & (g_view[None] == "rear"))
+               | ((q_view[:, None] == "rear") & (g_view[None] == "front")))
         score = score + view["beta"] * opp
+    else:
+        q_view, g_view = np.full(len(q), "-"), np.full(len(g), "-")
     order = np.argsort(-score, axis=1, kind="stable")[:, :10]
     write_submission(f"{args.out}/submission.csv", q_ids, g_ids, order)
     # кандидат = top-1 итогового кросс-камерного ранжирования, уверенность — его косинус
     cands = candidates_df(q_ids, g_ids, cos, order, args.threshold)
-    cands.to_csv(f"{args.out}/candidates.csv", index=False)
+    cands.to_csv(f"{args.out}/candidates.csv", index=False, lineterminator="\n")
+    # всё, кроме эмбеддингов, что нужно для ранжирования: по этому файлу и embeddings.npy
+    # reproduce_ranking.py пересобирает submission.csv и candidates.csv байт в байт
+    pd.DataFrame({"image_id": q_ids + g_ids, "part": ["query"] * len(q) + ["gallery"] * len(g),
+                  "camera_pred": np.concatenate([q_cam, g_cam]),
+                  "view_pred": np.concatenate([q_view, g_view])}).to_csv(
+        f"{args.out}/ranking_inputs.csv", index=False, lineterminator="\n")
     print(f"{args.out}: {len(q)} query, {len(g)} gallery, кандидатов {len(cands)}, "
           f"{time.time() - t0:.0f} с")
 

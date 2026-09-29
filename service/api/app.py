@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
-from engine import Engine, crop_box
+from engine import Engine, crop_box, explain as explain_pair, validate_bbox
 from store import Store
 
 WEIGHTS = os.environ.get("WEIGHTS", "weights")
@@ -94,7 +94,7 @@ def embed_or_400(img, bbox):
 
 @app.get("/api/health", summary="Состояние сервиса")
 def health():
-    return {"status": "ok", "gallery": store.count(), "readonly": READONLY, "index": store.kind, "providers": engine.providers,
+    return {"status": "ok", "gallery": store.count(), "readonly": READONLY, "explain": engine.explainer is not None, "index": store.kind, "providers": engine.providers,
             "models": [m[3] for m in engine.models], "threshold": engine.threshold, "dim": store.dim}
 
 
@@ -127,6 +127,26 @@ def search(file: UploadFile = File(..., description="кадр JPEG/PNG"),
     cands = [r for r in ranking[:1] if r.accepted]
     return SearchResult(refused=not cands, threshold=thr, query_camera=cam, candidates=cands,
                         ranking=ranking, ms=round((time.time() - t0) * 1000, 1))
+
+
+@app.post("/api/explain", summary="Карта внимания: какие участки машин дали сходство")
+def explain(file: UploadFile = File(..., description="кадр-запрос"),
+            gallery_id: int = Form(..., description="id кандидата из галереи"),
+            x: Optional[float] = Form(None), y: Optional[float] = Form(None),
+            w: Optional[float] = Form(None), h: Optional[float] = Form(None)):
+    img = read_image(file).convert("RGB")
+    bbox = full_bbox(img, x, y, w, h)
+    try:
+        validate_bbox(img, bbox)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    p = f"{STORE}/crops/{gallery_id}.jpg"
+    if not os.path.exists(p):
+        raise HTTPException(404, "нет такого объекта в галерее")
+    try:
+        return explain_pair(engine, crop_box(img, bbox), Image.open(p).convert("RGB"))
+    except RuntimeError as e:
+        raise HTTPException(501, str(e))
 
 
 @app.post("/api/embed", summary="Эмбеддинг ТС (цифровой признак)")
