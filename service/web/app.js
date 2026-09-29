@@ -6,7 +6,7 @@
   const S = {
     img: null, blob: null, W: 0, H: 0, bbox: null, dets: [], sampleId: null,
     result: null, active: 0, explain: new Map(), readonly: false, canExplain: false,
-    galOffset: 0, galLimit: 60, queryCrop: null, queryAspect: 1, token: 0, drawMode: false,
+    galOffset: 0, galLimit: 60, queryCrop: null, queryAspect: 1, token: 0, drawMode: false, pending: new Map(),
   };
 
   // ---------------------------------------------------------------- утилиты
@@ -487,15 +487,30 @@
     if (!m) return;
     const key = `${S.token}|${JSON.stringify(S.bbox)}|${m.id}`;
     $("#heatBar").classList.remove("hidden");
+    if (m.score < S.result.threshold) {             // объяснять «совпадение» с другой машиной бессмысленно
+      showPlain();
+      $("#heatNote").textContent = `Близость ${m.score.toFixed(3)} ниже порога ${S.result.threshold.toFixed(2)} — это, скорее всего, ` +
+        "другая машина. Карта показывает детали, давшие совпадение, поэтому для такой пары не строится: " +
+        "у разных машин совпадать нечему, и пятна были бы случайными. Выберите кандидата выше порога.";
+      return;
+    }
     try {
       let d = S.explain.get(key);
       if (!d) {
-        $("#heatNote").textContent = "считаем карту внимания…";
-        const f = new FormData();
-        f.append("file", S.blob, "frame.jpg");
-        f.append("gallery_id", m.id);
-        for (const k of ["x", "y", "w", "h"]) f.append(k, Math.round(S.bbox[k]));
-        d = await api("/api/explain", { method: "POST", body: f });
+        const t0 = Date.now(), note = $("#heatNote");
+        const tick = () => { note.textContent = `считаем карту внимания… ${Math.round((Date.now() - t0) / 1000)} с`; };
+        tick();
+        const timer = setInterval(tick, 1000);
+        try {
+          if (!S.pending.has(key)) {                 // повторное нажатие не запускает второй расчёт
+            const f = new FormData();
+            f.append("file", S.blob, "frame.jpg");
+            f.append("gallery_id", m.id);
+            for (const k of ["x", "y", "w", "h"]) f.append(k, Math.round(S.bbox[k]));
+            S.pending.set(key, api("/api/explain", { method: "POST", body: f }).finally(() => S.pending.delete(key)));
+          }
+          d = await S.pending.get(key);
+        } finally { clearInterval(timer); }
         S.explain.set(key, d);
       }
       if (!$("#heatToggle").checked || S.result.ranking[S.active] !== m) return;
@@ -508,9 +523,7 @@
         h.style.backgroundImage = `url(${part.heat})`;
         h.style.opacity = op;
       }
-      $("#heatNote").textContent = m.score < S.result.threshold
-        ? "Кандидат ниже порога — скорее всего, это другая машина: совпадать почти нечему, поэтому пятна слабые и могут попасть на фон. " + HEAT_NOTE
-        : HEAT_NOTE;
+      $("#heatNote").textContent = HEAT_NOTE;
     } catch (e) {
       $("#heatToggle").checked = false;
       $("#heatBar").classList.add("hidden");
@@ -518,7 +531,8 @@
     }
   }
   const HEAT_NOTE = "Яркое — участки 14×14 px, которые сильнее всего совпали у двух снимков (фары, решётка, колёса, стойки). " +
-    "Точное разложение близости ViT-модели по участкам; показаны 40% самых значимых — слабый ровный вклад фона и асфальта скрыт.";
+    "Разложение близости ViT-модели по участкам; показаны 40% самых значимых, слабый ровный вклад фона скрыт. " +
+    "Модель видит весь кроп, поэтому часть вклада может приходиться на край кадра рядом с машиной.";
   $("#heatToggle").onchange = e => {
     if (e.target.checked) showExplain();
     else { $("#heatBar").classList.add("hidden"); showPlain(); }
