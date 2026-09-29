@@ -149,3 +149,18 @@ def test_detect(client):
     blank = io.BytesIO()
     Image.new("RGB", (640, 360)).save(blank, "JPEG")
     assert c.post("/api/detect", files={"file": ("b.jpg", blank.getvalue(), "image/jpeg")}).json()["vehicles"] == []
+
+
+def test_phone_photo_exif_rotation(client):
+    """Фото с телефона: пиксели повёрнуты, поворот записан в EXIF — сервис видит кадр так же, как браузер."""
+    c, _ = client
+    data, _ = _sample_jpeg()
+    img = Image.open(io.BytesIO(data))
+    exif = Image.Exif()
+    exif[0x0112] = 6                                   # «повернуть на 90° по часовой при показе»
+    buf = io.BytesIO()
+    img.transpose(Image.ROTATE_90).save(buf, "JPEG", exif=exif)
+    a = c.post("/api/detect", files={"file": ("a.jpg", data, "image/jpeg")}).json()
+    b = c.post("/api/detect", files={"file": ("b.jpg", buf.getvalue(), "image/jpeg")}).json()
+    assert (b["width"], b["height"]) == (a["width"], a["height"])
+    assert len(a["vehicles"]) == len(b["vehicles"])
